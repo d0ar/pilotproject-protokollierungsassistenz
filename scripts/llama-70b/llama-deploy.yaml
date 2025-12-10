@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-70b
+  namespace: ollama-test
+  labels:
+    app: llama-70b
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: llama-70b
+  template:
+    metadata:
+      labels:
+        app: llama-70b
+    spec:
+      nodeSelector:
+        gpu: h100
+      restartPolicy: Always
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: llama-70b
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "16Gi"
+        - name: config
+          configMap:
+            name: llama-config
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          command: ["vllm", "serve"]
+          args:
+            - "nvidia/Llama-3.3-70B-Instruct-FP8"
+            - "--config=/config/llama-config.yaml"
+            - "--tensor-parallel-size=1"
+            - "--max-num-seqs=512"
+            - "--host=0.0.0.0"
+            - "--port=8000"
+            - "--download-dir=/cache/hf"
+          env:
+            - name: HF_HOME
+              value: /cache/hf
+            - name: HF_HUB_ENABLE_HF_TRANSFER
+              value: "1"
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            requests:
+              nvidia.com/gpu: "1"
+              cpu: "8"
+              memory: "40Gi"
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: "16"
+              memory: "80Gi"
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /cache
+            - name: shm
+              mountPath: /dev/shm
+            - name: config
+              mountPath: /config
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 300
+            periodSeconds: 30
+            failureThreshold: 60
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 360
+            periodSeconds: 20
+            timeoutSeconds: 5
