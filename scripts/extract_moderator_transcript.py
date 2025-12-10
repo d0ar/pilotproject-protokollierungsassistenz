@@ -243,7 +243,7 @@ def main():
 
     # Configuration
     moderator_speaker_id = "SPEAKER_18"  # Change this to the actual moderator ID
-    transcript_file = "/home/parasmehta/Projects/tuiv/data/LK_OS/20250515_LAWI/20250515_LAWI.txt"
+    transcript_file = "/home/parasmehta/Projects/pilotproject-meeting-summarization-tuiv-ag/data/LK_OS/20250515_LAWI/20250515_LAWI.txt"
     output_file = None  # Auto-generated: will be *_moderator.txt
 
     # Initialize extractor
