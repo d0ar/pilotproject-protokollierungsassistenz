@@ -14,8 +14,26 @@ Configuration via environment variables:
 """
 
 import os
+
+# PyTorch 2.6+ changed torch.load() to use weights_only=True by default for security.
+# WhisperX uses pyannote-audio 3.x which stores OmegaConf configs in checkpoints.
+# pyannote-audio 4.x has the fix, but WhisperX pins to <4.0.0.
+# This env var is the official workaround until WhisperX updates its dependency.
+# See: https://github.com/m-bain/whisperX/issues/1304
+os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 import re
-from typing import List, Dict, Callable, Optional
+import logging
+from dataclasses import dataclass
+from typing import List, Dict, Callable, Optional, Any
+from whisperx.diarize import DiarizationPipeline
+
+# Configure logging with timestamps
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # WhisperX configuration
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "large-v2")
@@ -24,29 +42,34 @@ WHISPER_BATCH_SIZE = int(os.environ.get("WHISPER_BATCH_SIZE", "16"))
 WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE", "de")
 
 
-def transcribe_audio(
-    file_path: str,
-    progress_callback: Optional[Callable[[int, str], None]] = None,
-) -> List[Dict[str, str]]:
-    """
-    Transcribe audio file with speaker diarization using WhisperX.
+@dataclass
+class TranscriptionModels:
+    """Container for pre-loaded transcription models."""
+    whisper_model: Any
+    align_model: Any
+    align_metadata: Any
+    diarize_pipeline: Any
+    device: str
 
-    Args:
-        file_path: Path to audio file (MP3, WAV, M4A)
-        progress_callback: Optional callback for progress updates (progress%, message)
+
+def load_models() -> TranscriptionModels:
+    """
+    Load all models required for transcription.
+    Call this once at server startup to cache models in memory.
 
     Returns:
-        List of dicts with 'speaker' and 'text' keys
-
-    Requires:
-    - whisperx package: uv sync --extra whisperx
-    - CUDA-capable GPU (recommended) or CPU
-    - HuggingFace token for pyannote: export HF_TOKEN=your_token
+        TranscriptionModels containing all loaded models
     """
+    logger.info("=" * 60)
+    logger.info("LOADING TRANSCRIPTION MODELS (this may take several minutes)")
+    logger.info("=" * 60)
+
     try:
         import whisperx
         import torch
+        logger.info("Successfully imported whisperx and torch")
     except ImportError:
+        logger.error("WhisperX not installed")
         raise RuntimeError(
             "WhisperX nicht installiert. Installieren Sie mit: uv sync --extra whisperx"
         )
@@ -58,79 +81,132 @@ def transcribe_audio(
         device = WHISPER_DEVICE
 
     compute_type = "float16" if device == "cuda" else "int8"
+    logger.info(f"Using device: {device}, compute_type: {compute_type}")
 
-    if progress_callback:
-        progress_callback(5, f"Lade WhisperX Modell ({WHISPER_MODEL})...")
-
-    # Load model
-    model = whisperx.load_model(
+    # Load WhisperX model
+    logger.info(f"[1/3] Loading WhisperX model: {WHISPER_MODEL}...")
+    whisper_model = whisperx.load_model(
         WHISPER_MODEL,
         device,
         compute_type=compute_type,
         language=WHISPER_LANGUAGE,
     )
+    logger.info(f"[1/3] WhisperX model loaded successfully")
 
-    if progress_callback:
-        progress_callback(15, "Lade Audio...")
-
-    # Load audio
-    audio = whisperx.load_audio(file_path)
-
-    if progress_callback:
-        progress_callback(25, "Transkription läuft...")
-
-    # Transcribe
-    result = model.transcribe(
-        audio,
-        batch_size=WHISPER_BATCH_SIZE,
-        language=WHISPER_LANGUAGE,
-    )
-
-    if progress_callback:
-        progress_callback(50, "Alignment läuft...")
-
-    # Align whisper output
-    model_a, metadata = whisperx.load_align_model(
+    # Load alignment model
+    logger.info(f"[2/3] Loading alignment model for language: {WHISPER_LANGUAGE}...")
+    align_model, align_metadata = whisperx.load_align_model(
         language_code=WHISPER_LANGUAGE,
         device=device,
     )
-    result = whisperx.align(
-        result["segments"],
-        model_a,
-        metadata,
-        audio,
-        device,
-        return_char_alignments=False,
-    )
+    logger.info("[2/3] Alignment model loaded successfully")
 
-    if progress_callback:
-        progress_callback(65, "Sprechererkennung läuft...")
-
-    # Speaker diarization
+    # Load diarization pipeline
     hf_token = os.environ.get("HF_TOKEN")
     if not hf_token:
+        logger.error("HF_TOKEN not set")
         raise RuntimeError(
             "HuggingFace Token nicht gesetzt. "
             "Setzen Sie die HF_TOKEN Umgebungsvariable. "
             "Token erstellen unter: https://huggingface.co/settings/tokens"
         )
 
-    diarize_model = whisperx.DiarizationPipeline(
+    logger.info("[3/3] Loading diarization pipeline...")
+    diarize_pipeline = DiarizationPipeline(
         use_auth_token=hf_token,
         device=device,
     )
-    diarize_segments = diarize_model(audio)
+    logger.info("[3/3] Diarization pipeline loaded successfully")
+
+    logger.info("=" * 60)
+    logger.info("ALL MODELS LOADED SUCCESSFULLY - Server ready for requests")
+    logger.info("=" * 60)
+
+    return TranscriptionModels(
+        whisper_model=whisper_model,
+        align_model=align_model,
+        align_metadata=align_metadata,
+        diarize_pipeline=diarize_pipeline,
+        device=device,
+    )
+
+
+def transcribe_audio(
+    file_path: str,
+    models: TranscriptionModels,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
+) -> List[Dict[str, str]]:
+    """
+    Transcribe audio file with speaker diarization using WhisperX.
+
+    Args:
+        file_path: Path to audio file (MP3, WAV, M4A)
+        models: Pre-loaded TranscriptionModels from load_models()
+        progress_callback: Optional callback for progress updates (progress%, message)
+
+    Returns:
+        List of dicts with 'speaker' and 'text' keys
+    """
+    import whisperx
+
+    logger.info(f"Starting transcription for: {file_path}")
+
+    if progress_callback:
+        progress_callback(5, "Lade Audio...")
+
+    # Load audio
+    logger.info(f"Loading audio file: {file_path}")
+    audio = whisperx.load_audio(file_path)
+    logger.info(f"Audio loaded, duration: {len(audio)/16000:.1f} seconds")
+
+    if progress_callback:
+        progress_callback(15, "Transkription läuft...")
+
+    # Transcribe using pre-loaded model
+    logger.info(f"Starting transcription with batch_size={WHISPER_BATCH_SIZE}...")
+    result = models.whisper_model.transcribe(
+        audio,
+        batch_size=WHISPER_BATCH_SIZE,
+        language=WHISPER_LANGUAGE,
+    )
+    logger.info(f"Transcription complete, found {len(result.get('segments', []))} segments")
+
+    if progress_callback:
+        progress_callback(45, "Alignment läuft...")
+
+    # Align using pre-loaded model
+    logger.info("Running alignment...")
+    result = whisperx.align(
+        result["segments"],
+        models.align_model,
+        models.align_metadata,
+        audio,
+        models.device,
+        return_char_alignments=False,
+    )
+    logger.info("Alignment complete")
+
+    if progress_callback:
+        progress_callback(65, "Sprechererkennung läuft...")
+
+    # Speaker diarization using pre-loaded pipeline
+    logger.info("Running speaker diarization...")
+    diarize_segments = models.diarize_pipeline(audio)
+    logger.info("Diarization complete")
 
     if progress_callback:
         progress_callback(85, "Segmente werden zusammengeführt...")
 
     # Assign speakers to segments
+    logger.info("Assigning speakers to segments...")
     result = whisperx.assign_word_speakers(diarize_segments, result)
+    logger.info("Speaker assignment complete")
 
     if progress_callback:
         progress_callback(95, "Transkript wird erstellt...")
 
     # Convert to our format
+    logger.info("Creating transcript output...")
     transcript = []
     for segment in result["segments"]:
         speaker = segment.get("speaker", "UNKNOWN")
@@ -141,6 +217,7 @@ def transcribe_audio(
                 "text": text,
             })
 
+    logger.info(f"Transcription finished: {len(transcript)} lines")
     return transcript
 
 

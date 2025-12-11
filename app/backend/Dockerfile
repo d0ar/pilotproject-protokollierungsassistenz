@@ -5,9 +5,10 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies (ffmpeg required by whisperx)
+# Install system dependencies (ffmpeg required by whisperx, curl for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for package management

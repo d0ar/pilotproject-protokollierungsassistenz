@@ -4,6 +4,8 @@ FastAPI Backend for Meeting Minutes Generator
 
 import os
 import uuid
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
@@ -11,13 +13,49 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from transcribe import transcribe_audio
+from transcribe import transcribe_audio, load_models, TranscriptionModels
 from summarize import summarize_segment
+
+# Configure logging with timestamps
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan event handler.
+    Loads all ML models at startup and cleans up on shutdown.
+    """
+    logger.info("Server starting up - loading transcription models...")
+
+    try:
+        # Load models at startup (this takes several minutes)
+        app.state.models = load_models()
+        app.state.models_loaded = True
+        logger.info("Models loaded successfully - server ready")
+    except Exception as e:
+        logger.error(f"Failed to load models: {e}", exc_info=True)
+        app.state.models = None
+        app.state.models_loaded = False
+
+    yield  # Server is running
+
+    # Cleanup on shutdown
+    logger.info("Server shutting down - cleaning up...")
+    app.state.models = None
+    app.state.models_loaded = False
+
 
 app = FastAPI(
     title="Sitzungsprotokoll Generator API",
     description="API für die automatische Erstellung von Sitzungsprotokollen",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration - allow configurable origins via environment
@@ -76,6 +114,24 @@ async def root():
     return {"message": "Sitzungsprotokoll Generator API", "version": "0.1.0"}
 
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for Docker/Kubernetes.
+    Returns 200 only when models are loaded and server is ready.
+    """
+    if not getattr(app.state, "models_loaded", False):
+        raise HTTPException(
+            status_code=503,
+            detail="Models not loaded yet - server starting up"
+        )
+    return {
+        "status": "healthy",
+        "models_loaded": True,
+        "version": "0.1.0"
+    }
+
+
 @app.post("/api/transcribe", response_model=TranscriptionJob)
 async def start_transcription(
     background_tasks: BackgroundTasks,
@@ -85,23 +141,36 @@ async def start_transcription(
     Upload audio file and start transcription job.
     Returns job_id to poll for status.
     """
+    logger.info(f"Received transcription request: {audio.filename} ({audio.content_type})")
+
+    # Check if models are loaded
+    if not getattr(app.state, "models_loaded", False) or app.state.models is None:
+        logger.error("Transcription request rejected - models not loaded")
+        raise HTTPException(
+            status_code=503,
+            detail="Server startet noch - Modelle werden geladen. Bitte warten."
+        )
+
     # Validate file type
     allowed_types = ["audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/mp3"]
     if audio.content_type not in allowed_types and not audio.filename.endswith(
         (".mp3", ".wav", ".m4a")
     ):
+        logger.warning(f"Rejected file with invalid type: {audio.content_type}")
         raise HTTPException(
             status_code=400, detail=f"Ungültiger Dateityp. Erlaubt: MP3, WAV, M4A"
         )
 
     # Generate job ID
     job_id = str(uuid.uuid4())
+    logger.info(f"Created job: {job_id}")
 
     # Save uploaded file
     file_path = UPLOAD_DIR / f"{job_id}_{audio.filename}"
     with open(file_path, "wb") as f:
         content = await audio.read()
         f.write(content)
+    logger.info(f"Saved file: {file_path} ({len(content)} bytes)")
 
     # Initialize job
     jobs[job_id] = {
@@ -113,8 +182,9 @@ async def start_transcription(
         "error": None,
     }
 
-    # Start background transcription
-    background_tasks.add_task(run_transcription, job_id, str(file_path))
+    # Start background transcription with pre-loaded models
+    logger.info(f"Starting background transcription task for job: {job_id}")
+    background_tasks.add_task(run_transcription, job_id, str(file_path), app.state.models)
 
     return TranscriptionJob(
         job_id=job_id,
@@ -170,36 +240,42 @@ async def generate_summary(request: SummarizeRequest):
 # ----- Background Tasks -----
 
 
-def run_transcription(job_id: str, file_path: str):
+def run_transcription(job_id: str, file_path: str, models: TranscriptionModels):
     """
-    Run transcription in background.
+    Run transcription in background using pre-loaded models.
     """
+    logger.info(f"[Job {job_id}] Background task started")
     try:
         # Update progress
         jobs[job_id]["status"] = "processing"
         jobs[job_id]["progress"] = 10
         jobs[job_id]["message"] = "Transkription wird vorbereitet..."
+        logger.info(f"[Job {job_id}] Status: processing, preparing transcription...")
 
-        # Run transcription
+        # Run transcription with pre-loaded models
         def progress_callback(progress: int, message: str):
             jobs[job_id]["progress"] = progress
             jobs[job_id]["message"] = message
+            logger.info(f"[Job {job_id}] Progress: {progress}% - {message}")
 
-        transcript = transcribe_audio(file_path, progress_callback)
+        transcript = transcribe_audio(file_path, models, progress_callback)
 
         # Update job with result
         jobs[job_id]["status"] = "completed"
         jobs[job_id]["progress"] = 100
         jobs[job_id]["message"] = "Transkription abgeschlossen"
         jobs[job_id]["transcript"] = transcript
+        logger.info(f"[Job {job_id}] Transcription completed successfully with {len(transcript)} lines")
 
         # Clean up uploaded file
         try:
             os.remove(file_path)
-        except:
-            pass
+            logger.info(f"[Job {job_id}] Cleaned up uploaded file: {file_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"[Job {job_id}] Failed to clean up file: {cleanup_error}")
 
     except Exception as e:
+        logger.error(f"[Job {job_id}] Transcription failed: {str(e)}", exc_info=True)
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["error"] = str(e)
         jobs[job_id]["message"] = f"Fehler: {str(e)}"
