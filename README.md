@@ -68,7 +68,7 @@ uv sync
 export HF_TOKEN=your_huggingface_token
 
 # Run development server
-uv run uvicorn main:app --reload
+uv run uvicorn main:app
 ```
 
 The backend runs on `http://localhost:8010`.

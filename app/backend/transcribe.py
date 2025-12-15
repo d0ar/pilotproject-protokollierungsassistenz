@@ -11,6 +11,10 @@ Configuration via environment variables:
 - WHISPER_DEVICE: Device to use - cuda/cpu (default: auto-detect)
 - WHISPER_BATCH_SIZE: Batch size for transcription (default: 16)
 - WHISPER_LANGUAGE: Language code (default: de)
+
+NOTE: For GPU support, you must set LD_LIBRARY_PATH before starting the server:
+  export LD_LIBRARY_PATH=$(python -c "import nvidia.cudnn; print(nvidia.cudnn.__path__[0])")/lib:$LD_LIBRARY_PATH
+See: https://github.com/m-bain/whisperX/issues/902
 """
 
 import os
@@ -205,19 +209,23 @@ def transcribe_audio(
     if progress_callback:
         progress_callback(95, "Transkript wird erstellt...")
 
-    # Convert to our format
+    # Convert to our format and merge consecutive segments from same speaker
     logger.info("Creating transcript output...")
     transcript = []
     for segment in result["segments"]:
         speaker = segment.get("speaker", "UNKNOWN")
         text = segment.get("text", "").strip()
         if text:
-            transcript.append({
-                "speaker": speaker,
-                "text": text,
-            })
+            # Merge with previous segment if same speaker
+            if transcript and transcript[-1]["speaker"] == speaker:
+                transcript[-1]["text"] += " " + text
+            else:
+                transcript.append({
+                    "speaker": speaker,
+                    "text": text,
+                })
 
-    logger.info(f"Transcription finished: {len(transcript)} lines")
+    logger.info(f"Transcription finished: {len(transcript)} lines (merged from {len(result['segments'])} segments)")
     return transcript
 
 
