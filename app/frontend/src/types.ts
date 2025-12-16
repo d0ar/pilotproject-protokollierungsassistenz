@@ -29,6 +29,7 @@ export interface SummarizeResponse {
 // Component Props Types
 export interface LayoutProps {
   children: React.ReactNode;
+  onSettingsClick?: () => void;
 }
 
 export interface StepIndicatorProps {
@@ -55,6 +56,8 @@ export interface AssignmentStepProps {
   transcript: TranscriptLine[];
   assignments: (number | null)[];
   setAssignments: (assignments: (number | null)[]) => void;
+  speakerNames: Record<string, string>;
+  setSpeakerNames: (names: Record<string, string>) => void;
 }
 
 export interface SummaryStepProps {
@@ -66,6 +69,7 @@ export interface SummaryStepProps {
   setSummaries: (summaries: Record<number, string>) => void;
   onRegenerateSummary: (topIndex: number) => Promise<void>;
   isGenerating: boolean;
+  speakerNames: Record<string, string>;
 }
 
 // Color palette type for TOPs

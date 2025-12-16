@@ -100,6 +100,8 @@ class TranscriptionJob(BaseModel):
 class SummarizeRequest(BaseModel):
     top_title: str
     lines: List[TranscriptLine]
+    model: Optional[str] = None  # LLM model to use (e.g., "qwen3:8b")
+    system_prompt: Optional[str] = None  # Custom system prompt
 
 
 class SummarizeResponse(BaseModel):
@@ -229,7 +231,12 @@ async def generate_summary(request: SummarizeRequest):
     text = "\n".join([f"{line.speaker}: {line.text}" for line in request.lines])
 
     try:
-        summary = summarize_segment(request.top_title, text)
+        summary = summarize_segment(
+            request.top_title,
+            text,
+            model=request.model,
+            system_prompt=request.system_prompt,
+        )
         return SummarizeResponse(summary=summary)
     except Exception as e:
         raise HTTPException(
@@ -279,6 +286,17 @@ def run_transcription(job_id: str, file_path: str, models: TranscriptionModels):
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["error"] = str(e)
         jobs[job_id]["message"] = f"Fehler: {str(e)}"
+
+        # Clean up GPU memory even on failure
+        try:
+            import gc
+            import torch
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info(f"[Job {job_id}] GPU memory cleared after error")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

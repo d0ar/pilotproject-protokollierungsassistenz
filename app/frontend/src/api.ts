@@ -72,11 +72,20 @@ export async function pollTranscription(
 }
 
 /**
+ * Options for summary generation.
+ */
+export interface SummarizeOptions {
+  model?: string;
+  systemPrompt?: string;
+}
+
+/**
  * Generate a summary for a TOP segment.
  */
 export async function generateSummary(
   topTitle: string,
-  lines: TranscriptLine[]
+  lines: TranscriptLine[],
+  options?: SummarizeOptions
 ): Promise<string> {
   const response = await fetch(`${API_BASE}/api/summarize`, {
     method: "POST",
@@ -86,6 +95,8 @@ export async function generateSummary(
     body: JSON.stringify({
       top_title: topTitle,
       lines: lines,
+      model: options?.model,
+      system_prompt: options?.systemPrompt,
     }),
   });
 

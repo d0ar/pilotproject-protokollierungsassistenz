@@ -135,6 +135,19 @@ def load_models() -> TranscriptionModels:
     )
 
 
+def _cleanup_gpu_memory():
+    """Free GPU memory after transcription to prevent OOM on subsequent runs."""
+    import gc
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logger.info("GPU memory cache cleared")
+    except Exception as e:
+        logger.warning(f"Failed to clear GPU cache: {e}")
+
+
 def transcribe_audio(
     file_path: str,
     models: TranscriptionModels,
@@ -226,6 +239,11 @@ def transcribe_audio(
                 })
 
     logger.info(f"Transcription finished: {len(transcript)} lines (merged from {len(result['segments'])} segments)")
+
+    # Clean up GPU memory to prevent OOM on subsequent transcriptions
+    del audio, result, diarize_segments
+    _cleanup_gpu_memory()
+
     return transcript
 
 

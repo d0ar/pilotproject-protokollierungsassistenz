@@ -1,5 +1,6 @@
 import { useState, type MouseEvent } from 'react';
 import type { AssignmentStepProps, TopColor } from '../types';
+import SpeakerNameEditor from './SpeakerNameEditor';
 
 // Color palette for TOPs
 const topColors: TopColor[] = [
@@ -20,9 +21,14 @@ export default function AssignmentStep({
   transcript,
   assignments,
   setAssignments,
+  speakerNames,
+  setSpeakerNames,
 }: AssignmentStepProps) {
   const [selectedTop, setSelectedTop] = useState(0);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
+
+  // Helper to get display name for a speaker
+  const getDisplayName = (speakerId: string) => speakerNames[speakerId] || speakerId;
 
   const getColor = (topIndex: number): TopColor => topColors[topIndex % topColors.length]!;
 
@@ -74,6 +80,13 @@ export default function AssignmentStep({
           farblich markiert
         </p>
       </div>
+
+      {/* Speaker Name Editor */}
+      <SpeakerNameEditor
+        transcript={transcript}
+        speakerNames={speakerNames}
+        setSpeakerNames={setSpeakerNames}
+      />
 
       {/* Progress */}
       <div className="flex items-center justify-between text-sm text-gray-600">
@@ -144,7 +157,7 @@ export default function AssignmentStep({
                   }`}
                 >
                   <span className="font-medium text-gray-600">
-                    {line.speaker}:
+                    {getDisplayName(line.speaker)}:
                   </span>{' '}
                   <span className="text-gray-800">{line.text}</span>
                 </div>
