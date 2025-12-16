@@ -36,12 +36,18 @@ export interface StepIndicatorProps {
   currentStep: number;
 }
 
+export interface LLMSettings {
+  model: string;
+  systemPrompt: string;
+}
+
 export interface UploadStepProps {
   onNext: () => void;
   audioFile: File | null;
   setAudioFile: (file: File | null) => void;
   tops: string[];
   setTops: (tops: string[]) => void;
+  llmSettings?: LLMSettings;
 }
 
 export interface ProcessingStepProps {

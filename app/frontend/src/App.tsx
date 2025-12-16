@@ -247,6 +247,7 @@ export default function App() {
           setAudioFile={setAudioFile}
           tops={tops}
           setTops={setTops}
+          llmSettings={llmSettings}
         />
       ) : currentStep === 2 ? (
         <AssignmentStep

@@ -110,6 +110,46 @@ export async function generateSummary(
 }
 
 /**
+ * Options for TOP extraction from PDF.
+ */
+export interface ExtractTOPsOptions {
+  model?: string;
+  systemPrompt?: string;
+}
+
+/**
+ * Extract TOPs (agenda items) from a PDF meeting invitation.
+ */
+export async function extractTOPsFromPDF(
+  pdfFile: File,
+  options?: ExtractTOPsOptions
+): Promise<string[]> {
+  const formData = new FormData();
+  formData.append("pdf", pdfFile);
+
+  // Add optional parameters as form fields
+  if (options?.model) {
+    formData.append("model", options.model);
+  }
+  if (options?.systemPrompt) {
+    formData.append("system_prompt", options.systemPrompt);
+  }
+
+  const response = await fetch(`${API_BASE}/api/extract-tops`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Fehler beim Extrahieren der TOPs");
+  }
+
+  const data = await response.json();
+  return data.tops;
+}
+
+/**
  * Check if the backend is available.
  */
 export async function checkBackendHealth(): Promise<boolean> {

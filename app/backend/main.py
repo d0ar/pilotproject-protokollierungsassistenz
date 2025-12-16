@@ -9,12 +9,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from transcribe import transcribe_audio, load_models, TranscriptionModels
 from summarize import summarize_segment
+from extract_tops import extract_tops_from_pdf
 
 # Configure logging with timestamps
 logging.basicConfig(
@@ -106,6 +107,10 @@ class SummarizeRequest(BaseModel):
 
 class SummarizeResponse(BaseModel):
     summary: str
+
+
+class ExtractTOPsResponse(BaseModel):
+    tops: List[str]
 
 
 # ----- Endpoints -----
@@ -242,6 +247,63 @@ async def generate_summary(request: SummarizeRequest):
         raise HTTPException(
             status_code=500, detail=f"Fehler bei der Zusammenfassung: {str(e)}"
         )
+
+
+@app.post("/api/extract-tops", response_model=ExtractTOPsResponse)
+async def extract_tops_endpoint(
+    pdf: UploadFile = File(...),
+    model: Optional[str] = Form(None),
+    system_prompt: Optional[str] = Form(None),
+):
+    """
+    Extract TOPs (agenda items) from a German municipal meeting invitation PDF.
+    Uses LLM to intelligently parse the document structure.
+    """
+    logger.info(f"Received PDF for TOP extraction: {pdf.filename} ({pdf.content_type})")
+
+    # Validate file type
+    if pdf.content_type != "application/pdf" and not pdf.filename.endswith(".pdf"):
+        logger.warning(f"Rejected non-PDF file: {pdf.content_type}")
+        raise HTTPException(
+            status_code=400,
+            detail="Nur PDF-Dateien sind erlaubt"
+        )
+
+    # Save uploaded file temporarily
+    file_id = str(uuid.uuid4())
+    file_path = UPLOAD_DIR / f"{file_id}_{pdf.filename}"
+
+    try:
+        with open(file_path, "wb") as f:
+            content = await pdf.read()
+            f.write(content)
+        logger.info(f"Saved PDF: {file_path} ({len(content)} bytes)")
+
+        # Extract TOPs using LLM
+        tops = extract_tops_from_pdf(
+            str(file_path),
+            model=model,
+            system_prompt=system_prompt,
+        )
+
+        logger.info(f"Successfully extracted {len(tops)} TOPs from {pdf.filename}")
+        return ExtractTOPsResponse(tops=tops)
+
+    except Exception as e:
+        logger.error(f"TOP extraction failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Fehler bei der TOP-Extraktion: {str(e)}"
+        )
+
+    finally:
+        # Clean up uploaded file
+        try:
+            if file_path.exists():
+                os.remove(file_path)
+                logger.info(f"Cleaned up PDF file: {file_path}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to clean up PDF: {cleanup_error}")
 
 
 # ----- Background Tasks -----
