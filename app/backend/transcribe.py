@@ -145,7 +145,7 @@ def transcribe_audio(
     file_path: str,
     models: TranscriptionModels,
     progress_callback: Optional[Callable[[int, str], None]] = None,
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """
     Transcribe audio file with speaker diarization using WhisperX.
 
@@ -155,7 +155,7 @@ def transcribe_audio(
         progress_callback: Optional callback for progress updates (progress%, message)
 
     Returns:
-        List of dicts with 'speaker' and 'text' keys
+        List of dicts with 'speaker', 'text', 'start', and 'end' keys
     """
     import whisperx
 
@@ -221,7 +221,7 @@ def transcribe_audio(
         if progress_callback:
             progress_callback(95, "Transkript wird erstellt...")
 
-        # Convert to our format
+        # Convert to our format (including timestamps for audio sync)
         logger.info("Creating transcript output...")
         transcript = []
         for segment in result["segments"]:
@@ -231,6 +231,8 @@ def transcribe_audio(
                 transcript.append({
                     "speaker": speaker,
                     "text": text,
+                    "start": segment.get("start", 0.0),
+                    "end": segment.get("end", 0.0),
                 })
 
         logger.info(f"Transcription finished: {len(transcript)} lines")

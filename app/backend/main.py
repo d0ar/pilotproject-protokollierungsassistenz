@@ -3,16 +3,19 @@ FastAPI Backend for Meeting Minutes Generator
 """
 
 import os
+import re
 import uuid
 import time
 import logging
+import mimetypes
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from transcribe import transcribe_audio, load_models, TranscriptionModels
@@ -89,10 +92,21 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 def cleanup_old_jobs() -> int:
     """
     Remove old or excess jobs from memory.
+    Also cleans up associated audio files.
     Returns number of jobs removed.
     """
     now = time.time()
     removed = 0
+
+    def cleanup_job_audio(job_id: str, job_data: dict) -> None:
+        """Clean up audio file associated with a job."""
+        audio_path = job_data.get("audio_path")
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+                logger.info(f"Cleaned up audio file for job {job_id}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up audio file for job {job_id}: {e}")
 
     # Remove jobs older than MAX_AGE
     jobs_to_remove = []
@@ -101,12 +115,14 @@ def cleanup_old_jobs() -> int:
             jobs_to_remove.append(job_id)
 
     for job_id in jobs_to_remove:
+        cleanup_job_audio(job_id, jobs[job_id])
         del jobs[job_id]
         removed += 1
 
     # Remove oldest jobs if count exceeds MAX_COUNT
     while len(jobs) > JOB_MAX_COUNT:
         oldest_job_id = next(iter(jobs))
+        cleanup_job_audio(oldest_job_id, jobs[oldest_job_id])
         del jobs[oldest_job_id]
         removed += 1
 
@@ -122,6 +138,8 @@ def cleanup_old_jobs() -> int:
 class TranscriptLine(BaseModel):
     speaker: str
     text: str
+    start: float  # Start time in seconds
+    end: float  # End time in seconds
 
 
 class TranscriptionJob(BaseModel):
@@ -130,6 +148,7 @@ class TranscriptionJob(BaseModel):
     progress: int
     message: str
     transcript: Optional[List[TranscriptLine]] = None
+    audio_url: Optional[str] = None  # URL to stream audio for playback
     error: Optional[str] = None
 
 
@@ -243,6 +262,13 @@ async def get_transcription_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job nicht gefunden")
 
     job = jobs[job_id]
+
+    # Generate audio URL if audio file is available
+    audio_url = None
+    audio_path = job.get("audio_path")
+    if audio_path and os.path.exists(audio_path):
+        audio_url = f"/api/audio/{job_id}"
+
     return TranscriptionJob(
         job_id=job_id,
         status=job["status"],
@@ -253,7 +279,76 @@ async def get_transcription_status(job_id: str):
             if job["transcript"]
             else None
         ),
+        audio_url=audio_url,
         error=job["error"],
+    )
+
+
+@app.get("/api/audio/{job_id}")
+async def stream_audio(
+    job_id: str,
+    range: Optional[str] = Header(None, alias="Range"),
+):
+    """
+    Stream audio file for a transcription job.
+    Supports HTTP Range requests for efficient seeking.
+    """
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job nicht gefunden")
+
+    job = jobs[job_id]
+    audio_path = job.get("audio_path")
+
+    if not audio_path or not os.path.exists(audio_path):
+        raise HTTPException(status_code=404, detail="Audio nicht mehr verfügbar")
+
+    file_size = os.path.getsize(audio_path)
+
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(audio_path)
+    if not content_type:
+        content_type = "audio/mpeg"
+
+    # Handle Range requests for seeking
+    if range:
+        # Parse range header: "bytes=start-end"
+        range_match = re.match(r"bytes=(\d+)-(\d*)", range)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+
+            if start >= file_size:
+                raise HTTPException(status_code=416, detail="Range Not Satisfiable")
+
+            chunk_size = end - start + 1
+
+            with open(audio_path, "rb") as f:
+                f.seek(start)
+                data = f.read(chunk_size)
+
+            return Response(
+                content=data,
+                status_code=206,
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(chunk_size),
+                    "Content-Type": content_type,
+                },
+            )
+
+    # Return full file if no range requested
+    with open(audio_path, "rb") as f:
+        data = f.read()
+
+    return Response(
+        content=data,
+        status_code=200,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+            "Content-Type": content_type,
+        },
     )
 
 
@@ -305,14 +400,9 @@ def run_transcription(job_id: str, file_path: str, models: TranscriptionModels):
         jobs[job_id]["progress"] = 100
         jobs[job_id]["message"] = "Transkription abgeschlossen"
         jobs[job_id]["transcript"] = transcript
+        # Keep audio_path for streaming playback (will be cleaned up when job expires)
+        jobs[job_id]["audio_path"] = file_path
         logger.info(f"[Job {job_id}] Transcription completed successfully with {len(transcript)} lines")
-
-        # Clean up uploaded file
-        try:
-            os.remove(file_path)
-            logger.info(f"[Job {job_id}] Cleaned up uploaded file: {file_path}")
-        except Exception as cleanup_error:
-            logger.warning(f"[Job {job_id}] Failed to clean up file: {cleanup_error}")
 
     except Exception as e:
         logger.error(f"[Job {job_id}] Transcription failed: {str(e)}", exc_info=True)
