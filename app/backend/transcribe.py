@@ -143,6 +143,7 @@ def _cleanup_memory(device: str) -> None:
     gc.collect()
     try:
         if device == "cuda" and torch.cuda.is_available():
+            torch.cuda.synchronize()  # Wait for all CUDA ops to complete
             torch.cuda.empty_cache()
             logger.info("GPU memory cache cleared")
     except Exception as e:

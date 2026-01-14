@@ -12,16 +12,6 @@ interface LLMSettingsPanelProps {
   onSettingsChange: (settings: LLMSettings) => void;
 }
 
-// Available models grouped by capability
-const MODELS = [
-  { id: 'gemma3:4b', name: 'Gemma 3 4B', category: 'fast', label: 'Schnell' },
-  { id: 'qwen3:8b', name: 'Qwen 3 8B', category: 'balanced', label: 'Standard' },
-  { id: 'llama3.1:8b', name: 'Llama 3.1 8B', category: 'balanced', label: 'Standard' },
-  { id: 'gemma3:12b', name: 'Gemma 3 12B', category: 'quality', label: 'Qualität' },
-  { id: 'qwen3:14b', name: 'Qwen 3 14B', category: 'quality', label: 'Qualität' },
-  { id: 'gemma3:27b', name: 'Gemma 3 27B', category: 'best', label: 'Beste' },
-];
-
 export const DEFAULT_SYSTEM_PROMPT = `Du bist ein Experte für die Erstellung von Sitzungsprotokollen für deutsche Kommunalverwaltungen.
 
 Deine Aufgabe ist es, aus einem Transkript eines Tagesordnungspunktes (TOP) eine Zusammenfassung im Stil einer offiziellen Niederschrift zu erstellen.
@@ -47,31 +37,12 @@ FORMAT:
 - Mittlere TOPs (10-50 Äußerungen): 2-3 Absätze
 - Lange TOPs (> 50 Äußerungen): 3-5 Absätze
 - Chronologischer Ablauf
-- Direkt mit Inhalt beginnen, keine Einleitung`;
+- Direkt mit Inhalt beginnen, keine Einleitung
+- NUR Fließtext, KEINE Markdown-Formatierung (keine **, keine #)`;
 
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   model: 'qwen3:8b',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
-};
-
-const getCategoryIcon = (category: string) => {
-  switch (category) {
-    case 'fast': return '⚡';
-    case 'balanced': return '⚖️';
-    case 'quality': return '✨';
-    case 'best': return '🏆';
-    default: return '';
-  }
-};
-
-const getCategoryColor = (category: string) => {
-  switch (category) {
-    case 'fast': return 'text-yellow-600 bg-yellow-50';
-    case 'balanced': return 'text-blue-600 bg-blue-50';
-    case 'quality': return 'text-purple-600 bg-purple-50';
-    case 'best': return 'text-amber-600 bg-amber-50';
-    default: return 'text-gray-600 bg-gray-50';
-  }
 };
 
 export default function LLMSettingsPanel({
@@ -109,10 +80,6 @@ export default function LLMSettingsPanel({
     }
   }, [isOpen, onClose]);
 
-  const handleModelChange = (model: string) => {
-    onSettingsChange({ ...settings, model });
-  };
-
   const handlePromptChange = (systemPrompt: string) => {
     onSettingsChange({ ...settings, systemPrompt });
   };
@@ -149,46 +116,6 @@ export default function LLMSettingsPanel({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Model Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Modell
-            </label>
-            <div className="space-y-2">
-              {MODELS.map((model) => {
-                const isSelected = settings.model === model.id;
-                return (
-                  <button
-                    key={model.id}
-                    onClick={() => handleModelChange(model.id)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        isSelected ? 'border-blue-500' : 'border-gray-300'
-                      }`}>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                      </div>
-                      <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>
-                        {model.name}
-                      </span>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getCategoryColor(model.category)}`}>
-                      {getCategoryIcon(model.category)} {model.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Divider */}
-          <hr className="border-gray-200" />
-
           {/* System Prompt */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -208,12 +135,12 @@ export default function LLMSettingsPanel({
             <textarea
               value={settings.systemPrompt}
               onChange={(e) => handlePromptChange(e.target.value)}
-              rows={12}
+              rows={16}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
               placeholder="System-Prompt eingeben..."
             />
             <p className="mt-2 text-xs text-gray-500">
-              Der System-Prompt definiert, wie die KI antwortet.
+              Der System-Prompt definiert, wie die KI die Zusammenfassungen erstellt.
             </p>
           </div>
         </div>

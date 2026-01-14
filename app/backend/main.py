@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from transcribe import transcribe_audio, load_models, TranscriptionModels
+from transcribe import transcribe_audio, load_models, TranscriptionModels, _cleanup_memory
 from summarize import summarize_segment
 from extract_tops import extract_tops_from_pdf
 
@@ -51,8 +51,12 @@ async def lifespan(app: FastAPI):
 
     yield  # Server is running
 
-    # Cleanup on shutdown
+    # Cleanup on shutdown - properly release GPU resources
     logger.info("Server shutting down - cleaning up...")
+    if hasattr(app.state, 'models') and app.state.models is not None:
+        device = app.state.models.device
+        del app.state.models
+        _cleanup_memory(device)
     app.state.models = None
     app.state.models_loaded = False
 

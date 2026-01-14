@@ -41,8 +41,16 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # To pull the model, run after starting:
-    # docker compose exec ollama ollama pull qwen3:8b
+      - ./scripts/ollama-entrypoint.sh:/ollama-entrypoint.sh:ro
+    environment:
+      - OLLAMA_MODEL=${LLM_MODEL:-qwen3:8b}
+    entrypoint: ["/bin/bash", "/ollama-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 300s  # 5 min grace period for model download
 
 volumes:
   ollama_data:

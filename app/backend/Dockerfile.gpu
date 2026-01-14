@@ -1,0 +1,60 @@
+# Backend Dockerfile for GPU deployment with NVIDIA CUDA support
+# Requires: NVIDIA GPU, NVIDIA Container Toolkit installed on host
+#
+# Build: docker build -f Dockerfile.gpu -t meeting-backend:gpu .
+# Run: docker run --gpus all -p 8010:8010 meeting-backend:gpu
+
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Install Python 3.10 and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-venv \
+    python3-pip \
+    ffmpeg \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3
+
+# Upgrade pip
+RUN python -m pip install --upgrade pip
+
+# Install uv for package management
+RUN pip install uv
+
+# Copy project files
+COPY pyproject.toml ./
+COPY *.py ./
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Install dependencies with CUDA support
+# Note: torch will automatically use CUDA when available
+RUN uv pip install --system -e .
+
+# Install nvidia-cudnn-cu12 for WhisperX GPU support
+# This provides the cuDNN libraries needed for faster-whisper
+RUN pip install nvidia-cudnn-cu12
+
+# Set LD_LIBRARY_PATH for cuDNN libraries
+# This is required for WhisperX/faster-whisper to find CUDA libraries
+# See: https://github.com/m-bain/whisperX/issues/902
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+
+# Expose port
+EXPOSE 8010
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=120s \
+    CMD curl -f http://localhost:8010/health || exit 1
+
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"]

@@ -1,0 +1,22 @@
+# Docker Compose override for GPU deployment
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+#
+# Requirements:
+# - NVIDIA GPU
+# - NVIDIA Container Toolkit (nvidia-docker2)
+# - Docker configured to use nvidia runtime
+
+services:
+  backend:
+    build:
+      context: ./app/backend
+      dockerfile: Dockerfile.gpu
+    environment:
+      - WHISPER_DEVICE=cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
