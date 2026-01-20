@@ -233,6 +233,7 @@ async def start_transcription(
 
     # Save uploaded file
     file_path = UPLOAD_DIR / f"{job_id}_{audio.filename}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     with open(file_path, "wb") as f:
         content = await audio.read()
         f.write(content)
@@ -413,6 +414,7 @@ async def extract_tops_endpoint(
     file_path = UPLOAD_DIR / f"{file_id}_{pdf.filename}"
 
     try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         with open(file_path, "wb") as f:
             content = await pdf.read()
             f.write(content)
