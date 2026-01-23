@@ -120,6 +120,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          no-cache: true
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
@@ -179,6 +180,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          no-cache: true
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
