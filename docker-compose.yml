@@ -25,7 +25,6 @@ services:
       - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-de}
       - LLM_BASE_URL=${LLM_BASE_URL:-http://ollama:11434/v1}
       - LLM_MODEL=${LLM_MODEL:-qwen3:8b}
-      - TELEMETRY_WEBHOOK_URL=${TELEMETRY_WEBHOOK_URL:-}
     volumes:
       - ./uploads:/app/uploads
     healthcheck:
@@ -33,7 +32,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s  # Reduced from 20 min - models are pre-loaded
+      start_period: 120s # Reduced from 20 min - models are pre-loaded
     depends_on:
       - ollama
     restart: unless-stopped
@@ -53,7 +52,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 60
-      start_period: 300s  # 5 min grace period for model download
+      start_period: 300s # 5 min grace period for model download
     restart: unless-stopped
 
 volumes:
