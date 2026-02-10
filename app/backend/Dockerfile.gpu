@@ -4,7 +4,7 @@
 # Build: docker build -f Dockerfile.gpu --build-arg HF_TOKEN=your_token -t backend:gpu .
 # Run: docker run --gpus all -p 8010:8010 backend:gpu
 
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     git \
+    wget \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.10 /usr/bin/python \
     && ln -sf /usr/bin/python3.10 /usr/bin/python3
@@ -36,17 +37,26 @@ COPY *.py ./
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Install dependencies with CUDA support
-# Note: torch will automatically use CUDA when available
+# Install PyTorch 2.8.0 with CUDA 12.8 support for sm_120 (RTX 5090/Blackwell)
+# Pin to 2.8.x because torchaudio >=2.9 removed AudioMetaData, which pyannote-audio (WhisperX dep) still needs
+RUN pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+
+# Install remaining dependencies using uv for better dependency resolution
+# Note: torch is already installed above, so uv will use the existing installation
 RUN uv pip install --system -e .
 
 # Install nvidia-cudnn-cu12 for WhisperX GPU support
 # This provides the cuDNN libraries needed for faster-whisper
 RUN pip install nvidia-cudnn-cu12
 
-# Set LD_LIBRARY_PATH for cuDNN libraries
-# This is required for WhisperX/faster-whisper to find CUDA libraries
-# See: https://github.com/m-bain/whisperX/issues/902
+# Set CUDA library paths for Blackwell GPUs
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV CUDA_HOME=/usr/local/cuda
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV CUDA_MODULE_LOADING=LAZY
+
+# Additional library path for cuDNN (Blackwell specific)
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 
 # Build argument for HuggingFace token (used only during build to download models)
