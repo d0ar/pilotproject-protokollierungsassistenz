@@ -41,7 +41,7 @@ FORMAT:
 - NUR Fließtext, KEINE Markdown-Formatierung (keine **, keine #)`;
 
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
-  model: 'qwen3:8b',
+  model: '',  // Empty = use backend's LLM_MODEL environment variable
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 

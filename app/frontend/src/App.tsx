@@ -60,7 +60,9 @@ export default function App() {
     try {
       const saved = localStorage.getItem(LLM_SETTINGS_KEY);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Don't use a model name from localStorage - let the backend decide via LLM_MODEL env var
+        return { ...parsed, model: '' };
       }
     } catch (e) {
       console.error('Failed to load LLM settings from localStorage:', e);
@@ -114,7 +116,7 @@ export default function App() {
 
       // Set audio URL for playback (construct full URL)
       if (completedJob.audio_url) {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8010';
+        const baseUrl = import.meta.env.VITE_API_URL || '';
         setAudioUrl(`${baseUrl}${completedJob.audio_url}`);
       }
 

@@ -4,7 +4,7 @@
 
 import type { TranscriptLine, TranscriptionJob } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8010";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 /**
  * Start a transcription job by uploading an audio file.
@@ -171,6 +171,31 @@ export async function checkBackendHealth(): Promise<boolean> {
     return response.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Backend settings response.
+ */
+export interface BackendSettings {
+  llmModel: string;
+  systemPrompt: string;
+}
+
+/**
+ * Fetch server-configured LLM settings (model, system prompt).
+ */
+export async function fetchBackendSettings(): Promise<BackendSettings | null> {
+  try {
+    const response = await fetch(`${API_BASE}/api/settings`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return {
+      llmModel: data.llm_model,
+      systemPrompt: data.system_prompt,
+    };
+  } catch {
+    return null;
   }
 }
 
