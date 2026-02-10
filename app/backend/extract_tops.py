@@ -135,6 +135,7 @@ TOPs:"""
             ],
             max_tokens=2048,
             temperature=0.1,  # Very low temperature for consistent extraction
+            extra_body={"keep_alive": 0},   # Unload model after extraction
         )
 
         raw_response = response.choices[0].message.content or ""
