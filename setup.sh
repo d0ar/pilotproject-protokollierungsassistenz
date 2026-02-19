@@ -456,12 +456,32 @@ check_gpu() {
             echo ""
 
             if [[ $REPLY =~ ^[Jj]$ ]]; then
-                if docker info 2>/dev/null | grep -q "nvidia"; then
+                # Check for NVIDIA Container Toolkit via multiple methods
+                local nvidia_docker_found=false
+                if docker info 2>/dev/null | grep -qi "nvidia"; then
+                    nvidia_docker_found=true
+                elif [ -f /etc/nvidia-container-runtime/config.toml ]; then
+                    nvidia_docker_found=true
+                elif [ -f /etc/docker/daemon.json ] && grep -q "nvidia" /etc/docker/daemon.json 2>/dev/null; then
+                    nvidia_docker_found=true
+                elif command -v nvidia-container-cli &> /dev/null; then
+                    nvidia_docker_found=true
+                fi
+
+                if [ "$nvidia_docker_found" = true ]; then
                     USE_GPU=true
                     success "GPU-Modus aktiviert"
                 else
                     warn "NVIDIA Container Toolkit nicht erkannt"
-                    echo "  Fuer GPU-Modus installieren Sie bitte nvidia-container-toolkit:"
+                    echo ""
+                    echo "  nvidia-smi funktioniert, aber Docker kann die GPU nicht nutzen."
+                    echo "  Bitte installieren Sie das NVIDIA Container Toolkit:"
+                    echo ""
+                    echo "  Ubuntu/Debian:"
+                    echo "    sudo apt-get install -y nvidia-container-toolkit"
+                    echo "    sudo systemctl restart docker"
+                    echo ""
+                    echo "  Weitere Informationen:"
                     echo "  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
                     echo ""
                     echo "  Fahre mit CPU-Modus fort..."
