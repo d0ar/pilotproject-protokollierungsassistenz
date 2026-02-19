@@ -14,11 +14,34 @@ import os
 import re
 from typing import Optional
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 # LLM server configuration (same as summarize.py)
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://localhost:11434/v1")
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:8b")
+
+# Derive native Ollama API base URL (strip /v1 suffix)
+_OLLAMA_NATIVE_URL = LLM_BASE_URL.rstrip("/")
+if _OLLAMA_NATIVE_URL.endswith("/v1"):
+    _OLLAMA_NATIVE_URL = _OLLAMA_NATIVE_URL[:-3]
+
+
+def _unload_ollama_model(model: str) -> None:
+    """Unload model from Ollama memory via native API."""
+    try:
+        response = requests.post(
+            f"{_OLLAMA_NATIVE_URL}/api/generate",
+            json={"model": model, "keep_alive": 0},
+            timeout=30,
+        )
+        if response.status_code == 200:
+            logger.info(f"Model '{model}' unloaded from Ollama memory")
+        else:
+            logger.warning(f"Unexpected response when unloading model: {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Failed to unload model from Ollama: {e}")
 
 # Default system prompt for TOP extraction
 DEFAULT_EXTRACTION_PROMPT = """Du bist ein Experte für deutsche Kommunalverwaltung und analysierst Einladungen zu Ausschusssitzungen.
@@ -135,7 +158,6 @@ TOPs:"""
             ],
             max_tokens=2048,
             temperature=0.1,  # Very low temperature for consistent extraction
-            extra_body={"keep_alive": 0},   # Unload model after extraction
         )
 
         raw_response = response.choices[0].message.content or ""
@@ -150,6 +172,8 @@ TOPs:"""
     except Exception as e:
         logger.error(f"LLM extraction failed: {e}")
         raise RuntimeError(f"TOP-Extraktion fehlgeschlagen: {str(e)}")
+    finally:
+        _unload_ollama_model(actual_model)
 
 
 def parse_tops_response(response_text: str) -> list[str]:

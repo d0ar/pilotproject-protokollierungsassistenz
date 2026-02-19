@@ -166,8 +166,8 @@ export async function extractTOPsFromPDF(
  */
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    console.log("Checking backend health at", API_BASE);
-    const response = await fetch(`${API_BASE}/`);
+    console.log("Checking backend health at", API_BASE || "(relative)");
+    const response = await fetch(`${API_BASE}/health`);
     return response.ok;
   } catch {
     return false;
