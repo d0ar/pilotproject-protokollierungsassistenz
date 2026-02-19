@@ -158,7 +158,7 @@ export default function App() {
         setAssignments(new Array(transcriptResult.length).fill(0));
         setCurrentStep(3);
         // Auto-generate summary for the entire conversation
-        generateSummaryForAll(transcriptResult);
+        generateSummaryForAll(transcriptResult, job.job_id);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
@@ -169,7 +169,8 @@ export default function App() {
   };
 
   // Generate summary for entire conversation (when no TOPs are defined)
-  const generateSummaryForAll = async (transcriptLines: TranscriptLine[]) => {
+  const generateSummaryForAll = async (transcriptLines: TranscriptLine[], currentJobId: string) => {
+    setIsGeneratingSummary(true);
     setSummaries({ 0: 'Zusammenfassung wird generiert...' });
 
     try {
@@ -184,9 +185,9 @@ export default function App() {
       setSummaries({ 0: result.summary });
 
       // Send telemetry
-      if (jobId) {
+      if (currentJobId) {
         reportSessionComplete({
-          jobId,
+          jobId: currentJobId,
           topCount: 1,
           protocolCharCount: result.summary.length,
           summarizationDurationSeconds: result.durationSeconds,
@@ -197,6 +198,8 @@ export default function App() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       setSummaries({ 0: `Fehler: ${errorMessage}` });
+    } finally {
+      setIsGeneratingSummary(false);
     }
   };
 
