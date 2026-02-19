@@ -121,8 +121,10 @@ export default function UploadStep({
   const removeTop = (index: number) => {
     if (tops.length > 1) {
       setTops(tops.filter((_, i) => i !== index));
-      setExtractedCount(null); // Clear success message when user modifies
+    } else {
+      setTops(['']);
     }
+    setExtractedCount(null); // Clear success message when user modifies
   };
 
   const clearAllTops = () => {
@@ -324,13 +326,8 @@ export default function UploadStep({
               />
               <button
                 onClick={() => removeTop(index)}
-                disabled={tops.length === 1}
-                className={`p-2 rounded-lg transition-colors ${
-                  tops.length === 1
-                    ? 'text-gray-300 cursor-not-allowed'
-                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                }`}
-                title={tops.length === 1 ? 'Mindestens ein TOP erforderlich' : 'TOP entfernen'}
+                className="p-2 rounded-lg transition-colors text-gray-400 hover:text-red-500 hover:bg-red-50"
+                title="TOP entfernen"
               >
                 ✕
               </button>

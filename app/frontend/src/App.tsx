@@ -21,6 +21,9 @@ import type { TranscriptLine } from './types';
 // LocalStorage key for LLM settings
 const LLM_SETTINGS_KEY = 'llm-settings';
 
+// Implicit TOP title when no TOPs are defined
+const DEFAULT_TOP_TITLE = 'Gesamtes Gespräch';
+
 // Generic system prompt for conversations without TOPs
 const GENERIC_SUMMARY_PROMPT = `Du bist ein Experte für die Zusammenfassung von Gesprächen und Audioaufnahmen.
 
@@ -154,7 +157,7 @@ export default function App() {
       } else {
         // No TOPs: create a single implicit TOP and auto-assign all lines
         setSkippedAssignment(true);
-        setTops(['Gesamtes Gespräch']);
+        setTops([DEFAULT_TOP_TITLE]);
         setAssignments(new Array(transcriptResult.length).fill(0));
         setCurrentStep(3);
         // Auto-generate summary for the entire conversation
@@ -175,7 +178,7 @@ export default function App() {
 
     try {
       const result = await generateSummary(
-        'Gesamtes Gespräch',
+        DEFAULT_TOP_TITLE,
         applySpeakerNames(transcriptLines),
         {
           model: llmSettings.model,
@@ -295,6 +298,7 @@ export default function App() {
       setSummaries({});
       setAudioUrl(null);
       setSkippedAssignment(false);
+      setIsGeneratingSummary(false);
     } else {
       setCurrentStep(2);
     }
