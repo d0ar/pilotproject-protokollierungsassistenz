@@ -21,6 +21,33 @@ import type { TranscriptLine } from './types';
 // LocalStorage key for LLM settings
 const LLM_SETTINGS_KEY = 'llm-settings';
 
+// Implicit TOP title when no TOPs are defined
+const DEFAULT_TOP_TITLE = 'Gesamtes Gespräch';
+
+// Generic system prompt for conversations without TOPs
+const GENERIC_SUMMARY_PROMPT = `Du bist ein Experte für die Zusammenfassung von Gesprächen und Audioaufnahmen.
+
+Deine Aufgabe ist es, aus einem Transkript eine klare und strukturierte Zusammenfassung zu erstellen.
+
+STIL:
+- Sachlich und gut lesbar
+- Dritte Person
+- Paraphrasieren statt wörtlich zitieren
+
+INHALT:
+- Wesentliche Themen und Diskussionspunkte
+- Wichtige Aussagen und Positionen der Teilnehmer
+- Getroffene Entscheidungen oder Vereinbarungen
+- Offene Punkte oder nächste Schritte
+
+FORMAT:
+- Kurze Gespräche (< 10 Äußerungen): 1-2 Absätze
+- Mittlere Gespräche (10-50 Äußerungen): 2-3 Absätze
+- Lange Gespräche (> 50 Äußerungen): 3-5 Absätze
+- Direkt mit Inhalt beginnen, keine Einleitung
+- NUR Fließtext, KEINE Markdown-Formatierung (keine **, keine #)
+`;
+
 export default function App() {
   // Current step in wizard
   const [currentStep, setCurrentStep] = useState(1);
@@ -41,6 +68,7 @@ export default function App() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [skippedAssignment, setSkippedAssignment] = useState(false);
 
   // Helper to apply speaker name mappings to transcript lines for summarization
   const applySpeakerNames = (lines: TranscriptLine[]): TranscriptLine[] => {
@@ -110,7 +138,6 @@ export default function App() {
       // Set transcript and audio URL
       const transcriptResult = completedJob.transcript ?? [];
       setTranscript(transcriptResult);
-      setAssignments(new Array(transcriptResult.length).fill(null));
 
       // Set audio URL for playback (use relative URL to go through nginx proxy)
       if (completedJob.audio_url) {
@@ -119,12 +146,63 @@ export default function App() {
       }
 
       setIsProcessing(false);
-      setCurrentStep(2);
+
+      // Check if TOPs were defined
+      const hasTops = tops.some((t) => t.trim() !== '');
+      if (hasTops) {
+        // Normal flow: go to assignment step
+        setSkippedAssignment(false);
+        setAssignments(new Array(transcriptResult.length).fill(null));
+        setCurrentStep(2);
+      } else {
+        // No TOPs: create a single implicit TOP and auto-assign all lines
+        setSkippedAssignment(true);
+        setTops([DEFAULT_TOP_TITLE]);
+        setAssignments(new Array(transcriptResult.length).fill(0));
+        setCurrentStep(3);
+        // Auto-generate summary for the entire conversation
+        generateSummaryForAll(transcriptResult, job.job_id);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       setProcessingError(errorMessage);
       setProcessingStatus(`Fehler: ${errorMessage}`);
       // Keep processing screen to show error
+    }
+  };
+
+  // Generate summary for entire conversation (when no TOPs are defined)
+  const generateSummaryForAll = async (transcriptLines: TranscriptLine[], currentJobId: string) => {
+    setIsGeneratingSummary(true);
+    setSummaries({ 0: 'Zusammenfassung wird generiert...' });
+
+    try {
+      const result = await generateSummary(
+        DEFAULT_TOP_TITLE,
+        applySpeakerNames(transcriptLines),
+        {
+          model: llmSettings.model,
+          systemPrompt: GENERIC_SUMMARY_PROMPT,
+        }
+      );
+      setSummaries({ 0: result.summary });
+
+      // Send telemetry
+      if (currentJobId) {
+        reportSessionComplete({
+          jobId: currentJobId,
+          topCount: 1,
+          protocolCharCount: result.summary.length,
+          summarizationDurationSeconds: result.durationSeconds,
+          llmModel: llmSettings.model,
+          systemPrompt: GENERIC_SUMMARY_PROMPT,
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      setSummaries({ 0: `Fehler: ${errorMessage}` });
+    } finally {
+      setIsGeneratingSummary(false);
     }
   };
 
@@ -211,7 +289,19 @@ export default function App() {
   };
 
   const handleStep3Back = () => {
-    setCurrentStep(2);
+    if (skippedAssignment) {
+      // Go back to upload step, reset auto-created TOP
+      setCurrentStep(1);
+      setTops(['', '', '']);
+      setTranscript([]);
+      setAssignments([]);
+      setSummaries({});
+      setAudioUrl(null);
+      setSkippedAssignment(false);
+      setIsGeneratingSummary(false);
+    } else {
+      setCurrentStep(2);
+    }
   };
 
   const handleRegenerateSummary = async (topIndex: number) => {
@@ -219,11 +309,12 @@ export default function App() {
 
     const validTops = tops.filter((t) => t.trim() !== '');
     const topLines = transcript.filter((_, i) => assignments[i] === topIndex);
+    const prompt = skippedAssignment ? GENERIC_SUMMARY_PROMPT : llmSettings.systemPrompt;
 
     try {
       const result = await generateSummary(validTops[topIndex]!, applySpeakerNames(topLines), {
         model: llmSettings.model,
-        systemPrompt: llmSettings.systemPrompt,
+        systemPrompt: prompt,
       });
       setSummaries((prev) => ({ ...prev, [topIndex]: result.summary }));
     } catch (error) {
