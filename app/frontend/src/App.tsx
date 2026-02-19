@@ -112,9 +112,9 @@ export default function App() {
       setTranscript(transcriptResult);
       setAssignments(new Array(transcriptResult.length).fill(null));
 
-      // Set audio URL for playback (construct full URL)
+      // Set audio URL for playback (use relative URL to go through nginx proxy)
       if (completedJob.audio_url) {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8010';
+        const baseUrl = import.meta.env.VITE_API_URL || '';
         setAudioUrl(`${baseUrl}${completedJob.audio_url}`);
       }
 

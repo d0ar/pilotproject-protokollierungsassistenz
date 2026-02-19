@@ -4,7 +4,7 @@
 
 import type { TranscriptLine, TranscriptionJob } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8010";
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 /**
  * Start a transcription job by uploading an audio file.
@@ -166,8 +166,8 @@ export async function extractTOPsFromPDF(
  */
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    console.log("Checking backend health at", API_BASE);
-    const response = await fetch(`${API_BASE}/`);
+    console.log("Checking backend health at", API_BASE || "(relative)");
+    const response = await fetch(`${API_BASE}/health`);
     return response.ok;
   } catch {
     return false;

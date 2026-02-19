@@ -566,6 +566,20 @@ show_success_message() {
     echo ""
     echo "Oeffnen Sie Ihren Browser:"
     echo -e "  ${GREEN}http://localhost:${PORT_FRONTEND}${NC}"
+
+    # Show network URL for access from other machines
+    local ip_addr
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ip_addr=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+    else
+        ip_addr=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    if [ -n "$ip_addr" ]; then
+        echo ""
+        echo "Zugriff von anderen Geraeten im Netzwerk:"
+        echo -e "  ${GREEN}http://${ip_addr}:${PORT_FRONTEND}${NC}"
+    fi
+
     echo ""
     echo "Nuetzliche Befehle:"
     echo "  ./setup.sh stop      Anwendung stoppen"
