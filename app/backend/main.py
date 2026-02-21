@@ -29,9 +29,7 @@ from pydantic import BaseModel
 from transcribe import (
     transcribe_audio,
     load_models,
-    TranscriptionModels,
-    TranscriptionResult,
-    _cleanup_memory,
+    unload_models,
     WHISPER_MODEL,
     WHISPER_BATCH_SIZE,
 )
@@ -52,30 +50,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     FastAPI lifespan event handler.
-    Loads all ML models at startup and cleans up on shutdown.
+    Models are loaded on demand per transcription request, not at startup.
     """
-    logger.info("Server starting up - loading transcription models...")
-
-    try:
-        # Load models at startup (this takes several minutes)
-        app.state.models = load_models()
-        app.state.models_loaded = True
-        logger.info("Models loaded successfully - server ready")
-    except Exception as e:
-        logger.error(f"Failed to load models: {e}", exc_info=True)
-        app.state.models = None
-        app.state.models_loaded = False
-
-    yield  # Server is running
-
-    # Cleanup on shutdown - properly release GPU resources
-    logger.info("Server shutting down - cleaning up...")
-    if hasattr(app.state, "models") and app.state.models is not None:
-        device = app.state.models.device
-        del app.state.models
-        _cleanup_memory(device)
-    app.state.models = None
-    app.state.models_loaded = False
+    logger.info("Server starting up - models will be loaded on demand")
+    yield
+    logger.info("Server shutting down")
 
 
 app = FastAPI(
@@ -218,13 +197,9 @@ async def root():
 async def health_check():
     """
     Health check endpoint for Docker/Kubernetes.
-    Returns 200 only when models are loaded and server is ready.
+    Returns 200 when the server is running. Models are loaded on demand.
     """
-    if not getattr(app.state, "models_loaded", False):
-        raise HTTPException(
-            status_code=503, detail="Models not loaded yet - server starting up"
-        )
-    return {"status": "healthy", "models_loaded": True, "version": "0.1.0"}
+    return {"status": "healthy", "version": "0.1.0"}
 
 
 @app.post("/api/transcribe", response_model=TranscriptionJob)
@@ -239,14 +214,6 @@ async def start_transcription(
     logger.info(
         f"Received transcription request: {audio.filename} ({audio.content_type})"
     )
-
-    # Check if models are loaded
-    if not getattr(app.state, "models_loaded", False) or app.state.models is None:
-        logger.error("Transcription request rejected - models not loaded")
-        raise HTTPException(
-            status_code=503,
-            detail="Server startet noch - Modelle werden geladen. Bitte warten.",
-        )
 
     # Validate file type
     allowed_types = ["audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/mp3"]
@@ -284,11 +251,9 @@ async def start_transcription(
     # Cleanup old jobs to prevent memory buildup
     cleanup_old_jobs()
 
-    # Start background transcription with pre-loaded models
+    # Start background transcription - models will be loaded on demand
     logger.info(f"Starting background transcription task for job: {job_id}")
-    background_tasks.add_task(
-        run_transcription, job_id, str(file_path), app.state.models
-    )
+    background_tasks.add_task(run_transcription, job_id, str(file_path))
 
     return TranscriptionJob(
         job_id=job_id,
@@ -551,44 +516,45 @@ async def report_session_complete(request: SessionCompleteRequest):
 # ----- Background Tasks -----
 
 
-def run_transcription(job_id: str, file_path: str, models: TranscriptionModels):
+def run_transcription(job_id: str, file_path: str):
     """
-    Run transcription in background using pre-loaded models.
+    Run transcription in background. Loads models on demand and unloads them afterward.
     """
     logger.info(f"[Job {job_id}] Background task started")
+    models = None
     try:
-        # Update progress
         jobs[job_id]["status"] = "processing"
+        jobs[job_id]["progress"] = 5
+        jobs[job_id]["message"] = "Modelle werden geladen..."
+        logger.info(f"[Job {job_id}] Loading transcription models...")
+
+        models = load_models()
+
         jobs[job_id]["progress"] = 10
         jobs[job_id]["message"] = "Transkription wird vorbereitet..."
-        logger.info(f"[Job {job_id}] Status: processing, preparing transcription...")
+        logger.info(f"[Job {job_id}] Models loaded, starting transcription...")
 
-        # Run transcription with pre-loaded models
         def progress_callback(progress: int, message: str):
-            jobs[job_id]["progress"] = progress
+            # Remap progress to 10-95 range to account for model loading step
+            remapped = 10 + int(progress * 0.85)
+            jobs[job_id]["progress"] = remapped
             jobs[job_id]["message"] = message
-            logger.info(f"[Job {job_id}] Progress: {progress}% - {message}")
+            logger.info(f"[Job {job_id}] Progress: {remapped}% - {message}")
 
-        # Time the transcription
         transcription_start = time.time()
         result = transcribe_audio(file_path, models, progress_callback)
         transcription_duration = time.time() - transcription_start
 
         transcript = result.transcript
-
-        # Calculate transcript metrics
         transcript_line_count = len(transcript)
         transcript_char_count = sum(len(line.get("text", "")) for line in transcript)
 
-        # Update job with result and telemetry data
         jobs[job_id]["status"] = "completed"
         jobs[job_id]["progress"] = 100
         jobs[job_id]["message"] = "Transkription abgeschlossen"
         jobs[job_id]["transcript"] = transcript
-        # Keep audio_path for streaming playback (will be cleaned up when job expires)
         jobs[job_id]["audio_path"] = file_path
 
-        # Store telemetry data for later reporting
         jobs[job_id]["telemetry"] = {
             "audio_duration_seconds": result.audio_duration_seconds,
             "transcription_duration_seconds": transcription_duration,
@@ -608,17 +574,10 @@ def run_transcription(job_id: str, file_path: str, models: TranscriptionModels):
         jobs[job_id]["error"] = str(e)
         jobs[job_id]["message"] = f"Fehler: {str(e)}"
 
-        # Clean up GPU memory even on failure
-        try:
-            import gc
-            import torch
-
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.info(f"[Job {job_id}] GPU memory cleared after error")
-        except Exception:
-            pass
+    finally:
+        if models is not None:
+            logger.info(f"[Job {job_id}] Unloading transcription models...")
+            unload_models(models)
 
 
 if __name__ == "__main__":

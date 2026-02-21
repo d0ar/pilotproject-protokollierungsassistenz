@@ -156,6 +156,18 @@ def _cleanup_memory(device: str) -> None:
         logger.warning(f"Failed to clear GPU cache: {e}")
 
 
+def unload_models(models: TranscriptionModels) -> None:
+    """Unload all transcription models and free GPU/RAM resources."""
+    logger.info("Unloading transcription models...")
+    device = models.device
+    del models.whisper_model
+    del models.align_model
+    del models.align_metadata
+    del models.diarize_pipeline
+    _cleanup_memory(device)
+    logger.info("Transcription models unloaded")
+
+
 @dataclass
 class TranscriptionResult:
     """Result from transcription including metrics."""
