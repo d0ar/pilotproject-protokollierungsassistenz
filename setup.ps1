@@ -444,36 +444,32 @@ function Test-GPU {
 
     $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
     if ($nvidiaSmi) {
-        try {
-            $null = nvidia-smi 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "NVIDIA GPU erkannt!"
-                Write-Host ""
-                Write-Host "GPU-Modus bietet deutlich schnellere Transkription."
-                $response = Read-Host "Moechten Sie den GPU-Modus verwenden? (j/N)"
+        nvidia-smi 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "NVIDIA GPU erkannt!"
+            Write-Host ""
+            Write-Host "GPU-Modus bietet deutlich schnellere Transkription."
+            $response = Read-Host "Moechten Sie den GPU-Modus verwenden? (j/N)"
 
-                if ($response -match "^[Jj]$") {
-                    $dockerInfo = docker info 2>&1
-                    if ($dockerInfo -match "nvidia") {
+            if ($response -match "^[Jj]$") {
+                $dockerInfo = docker info 2>&1
+                if ($dockerInfo -match "nvidia") {
+                    $script:USE_GPU = $true
+                    Write-Success "GPU-Modus aktiviert"
+                } else {
+                    Write-Warn "NVIDIA Container Toolkit moeglicherweise nicht konfiguriert"
+                    Write-Host "  Fuer GPU-Modus stellen Sie sicher, dass Docker Desktop GPU-Unterstuetzung hat."
+                    Write-Host "  Siehe: https://docs.docker.com/desktop/gpu/"
+                    Write-Host ""
+                    $continue = Read-Host "GPU-Modus trotzdem versuchen? (j/N)"
+                    if ($continue -match "^[Jj]$") {
                         $script:USE_GPU = $true
-                        Write-Success "GPU-Modus aktiviert"
                     } else {
-                        Write-Warn "NVIDIA Container Toolkit moeglicherweise nicht konfiguriert"
-                        Write-Host "  Fuer GPU-Modus stellen Sie sicher, dass Docker Desktop GPU-Unterstuetzung hat."
-                        Write-Host "  Siehe: https://docs.docker.com/desktop/gpu/"
-                        Write-Host ""
-                        $continue = Read-Host "GPU-Modus trotzdem versuchen? (j/N)"
-                        if ($continue -match "^[Jj]$") {
-                            $script:USE_GPU = $true
-                        } else {
-                            Write-Host "  Fahre mit CPU-Modus fort..."
-                        }
+                        Write-Host "  Fahre mit CPU-Modus fort..."
                     }
                 }
-                return
             }
-        } catch {
-            # nvidia-smi failed
+            return
         }
     }
 
