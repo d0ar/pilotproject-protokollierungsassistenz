@@ -6,11 +6,24 @@ Automatische Transkription und Protokollerstellung aus Audioaufnahmen von deutsc
 
 ### Screenshots
 
-| Upload | Processing |
-|:---:|:---:|
-| ![Upload](docs/screenshots/1.png) | ![Processing](docs/screenshots/2.png) |
-| **Assign segments to agenda items** | **Export meeting minutes** |
-| ![Assign](docs/screenshots/3.png) | ![Export](docs/screenshots/4.png) |
+<table>
+  <tr>
+    <td align="center"><strong>Upload</strong></td>
+    <td align="center"><strong>Processing</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/1.png" alt="Upload" width="400"></td>
+    <td><img src="docs/screenshots/2.png" alt="Processing" width="400"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Assign segments to agenda items</strong></td>
+    <td align="center"><strong>Export meeting minutes</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/3.png" alt="Assign" width="400"></td>
+    <td><img src="docs/screenshots/4.png" alt="Export" width="400"></td>
+  </tr>
+</table>
 
 ---
 
