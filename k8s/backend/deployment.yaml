@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tuiv-backend
+  name: tops-backend
   labels:
-    app: tuiv-backend
+    app: tops-backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tuiv-backend
+      app: tops-backend
   template:
     metadata:
       labels:
-        app: tuiv-backend
+        app: tops-backend
     spec:
       runtimeClassName: nvidia
       nodeSelector:
@@ -24,12 +24,12 @@ spec:
             - containerPort: 8010
           envFrom:
             - configMapRef:
-                name: tuiv-backend-config
+                name: tops-backend-config
           env:
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: tuiv-secret
+                  name: tops-secret
                   key: LLM_API_KEY
                   optional: true
           resources:

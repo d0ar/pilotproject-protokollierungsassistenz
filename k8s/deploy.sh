@@ -26,18 +26,18 @@ kubectl apply -k .
 echo "[4/4] Waiting for pods to be ready..."
 
 echo "  Waiting for frontend (should be quick)..."
-kubectl wait --for=condition=ready pod -l app=tuiv-frontend -n tuiv --timeout=60s
+kubectl wait --for=condition=ready pod -l app=tops-frontend -n tops --timeout=60s
 
 echo "  Waiting for backend (loading ML models — may take 3-5 minutes)..."
-kubectl wait --for=condition=ready pod -l app=tuiv-backend -n tuiv --timeout=600s
+kubectl wait --for=condition=ready pod -l app=tops-backend -n tops --timeout=600s
 
 echo ""
 echo "=== Deployment complete! ==="
 echo ""
 echo "Verify:"
-echo "  kubectl get pods -n tuiv"
-echo "  kubectl logs -f -n tuiv -l app=tuiv-backend"
+echo "  kubectl get pods -n tops"
+echo "  kubectl logs -f -n tops -l app=tops-backend"
 echo ""
 echo "Port-forward to test locally:"
-echo "  kubectl port-forward -n tuiv svc/tuiv-frontend 3000:80"
+echo "  kubectl port-forward -n tops svc/tops-frontend 3000:80"
 echo "  Open http://localhost:3000"

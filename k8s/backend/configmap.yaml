@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tuiv-backend-config
+  name: tops-backend-config
 data:
   WHISPER_MODEL: "large-v2"
   WHISPER_DEVICE: "cuda"

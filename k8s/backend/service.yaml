@@ -3,11 +3,11 @@ kind: Service
 metadata:
   name: backend
   labels:
-    app: tuiv-backend
+    app: tops-backend
 spec:
   type: ClusterIP
   selector:
-    app: tuiv-backend
+    app: tops-backend
   ports:
     - name: http
       port: 8010
