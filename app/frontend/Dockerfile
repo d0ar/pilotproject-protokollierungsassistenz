@@ -21,8 +21,12 @@ FROM nginx:alpine
 # Copy built files to nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx config as template (envsubst substitutes ${NGINX_RESOLVER} at container startup)
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+
+# Default DNS resolver: Docker's embedded DNS (works for Docker Compose / standalone Docker)
+# Override via env var for other environments (e.g. Kubernetes sets kube-dns)
+ENV NGINX_RESOLVER=127.0.0.11
 
 EXPOSE 80
 
