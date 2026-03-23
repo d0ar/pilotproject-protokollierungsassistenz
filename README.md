@@ -4,6 +4,27 @@ Automatic transcription and meeting minutes generation from audio recordings of 
 
 Automatische Transkription und Protokollerstellung aus Audioaufnahmen von deutschen Kommunalsitzungen.
 
+### Screenshots
+
+<table>
+  <tr>
+    <td align="center"><strong>Upload</strong></td>
+    <td align="center"><strong>Processing</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/1.png" alt="Upload" width="400"></td>
+    <td><img src="docs/screenshots/2.png" alt="Processing" width="400"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Assign segments to agenda items</strong></td>
+    <td align="center"><strong>Export meeting minutes</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/3.png" alt="Assign" width="400"></td>
+    <td><img src="docs/screenshots/4.png" alt="Export" width="400"></td>
+  </tr>
+</table>
+
 ---
 
 ## System Requirements / Systemanforderungen
@@ -384,6 +405,10 @@ docker build -f Dockerfile.gpu --build-arg HF_TOKEN=$HF_TOKEN -t backend:gpu ./a
 
 ---
 
-## License
+## Acknowledgements
 
-Developed at KI-Servicezentrum Berlin-Brandenburg.
+<a href="http://hpi.de/kisz">
+  <img src="app/frontend/public/logos/logo_bmftr_de.png" alt="BMFTR Logo" width="170">
+</a>
+
+The [AI Service Centre Berlin Brandenburg](http://hpi.de/kisz) is funded by the [Federal Ministry of Research, Technology and Space](https://www.bmbf.de/) under the funding code 01IS22092.

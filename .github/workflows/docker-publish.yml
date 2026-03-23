@@ -186,3 +186,16 @@ jobs:
             TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: [build-frontend, build-backend-gpu]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger GitLab deploy pipeline
+        run: |
+          curl -s --fail -X POST \
+          "https://gitlab.hpi.de/api/v4/projects/kisz%2Fprototypes%2Fprotokollierungsassistenz/trigger/pipeline" \
+          -F "token=${{ secrets.GITLAB_TRIGGER_TOKEN }}" \
+          -F "ref=main"

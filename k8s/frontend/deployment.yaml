@@ -1,24 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tuiv-frontend
+  name: tops-frontend
   labels:
-    app: tuiv-frontend
+    app: tops-frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tuiv-frontend
+      app: tops-frontend
   template:
     metadata:
       labels:
-        app: tuiv-frontend
+        app: tops-frontend
     spec:
       containers:
         - name: frontend
           image: ghcr.io/aihpi/pilotproject-protokollierungsassistenz/frontend:latest
           ports:
             - containerPort: 80
+          env:
+            - name: NGINX_RESOLVER
+              value: "kube-dns.kube-system.svc.cluster.local"
           readinessProbe:
             httpGet:
               path: /

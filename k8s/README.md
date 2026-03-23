@@ -12,7 +12,7 @@ Kubernetes manifests for deploying TUIV (Protokollierungsassistenz) on the HPI c
 ## Architecture
 
 ```
-Internet → Ingress (tuiv.example.com)
+Internet → Ingress (tops.aisc.hpi.de)
               ↓
          Frontend (nginx:80) — serves React SPA
               ↓ proxy_pass /api/ & /health
@@ -30,7 +30,7 @@ Internet → Ingress (tuiv.example.com)
 ```
 k8s/
 ├── kustomization.yaml          # Kustomize root — lists all resources
-├── namespace.yaml              # tuiv namespace
+├── namespace.yaml              # tops namespace
 ├── backend/
 │   ├── configmap.yaml          # Whisper + LLM environment variables
 │   ├── deployment.yaml         # GPU pod (A30), WhisperX + FastAPI
@@ -79,7 +79,7 @@ Edit `ingress.yaml` to set the actual hostname before deploying:
 ```yaml
 spec:
   rules:
-    - host: tuiv.your-domain.com  # ← change this
+    - host: tops.aisc.hpi.de  # ← change this to your desired hostname
 ```
 
 ## Deployment
@@ -92,7 +92,7 @@ cd k8s
 ```
 
 The script will:
-1. Create the `tuiv` namespace
+1. Create the `tops` namespace
 2. Apply secrets (if `secrets/secret.yaml` exists)
 3. Apply all Kustomize manifests
 4. Wait for frontend readiness (~10s)
@@ -110,13 +110,13 @@ kubectl apply -k .
 
 ```bash
 # Check pod status
-kubectl get pods -n tuiv
+kubectl get pods -n tops
 
 # Watch backend model loading
-kubectl logs -f -n tuiv -l app=tuiv-backend
+kubectl logs -f -n tops -l app=tops-backend
 
 # Port-forward to test locally
-kubectl port-forward -n tuiv svc/tuiv-frontend 3000:80
+kubectl port-forward -n tops svc/tops-frontend 3000:80
 # Open http://localhost:3000
 ```
 
@@ -126,11 +126,11 @@ When new container images are pushed to GHCR (handled by the existing GitHub Act
 
 ```bash
 # Restart to pull latest images
-kubectl rollout restart deployment/tuiv-backend -n tuiv
-kubectl rollout restart deployment/tuiv-frontend -n tuiv
+kubectl rollout restart deployment/tops-backend -n tops
+kubectl rollout restart deployment/tops-frontend -n tops
 
 # Watch the rollout
-kubectl rollout status deployment/tuiv-backend -n tuiv
+kubectl rollout status deployment/tops-backend -n tops
 ```
 
 ## Troubleshooting
@@ -140,22 +140,22 @@ kubectl rollout status deployment/tuiv-backend -n tuiv
 - Verify the NVIDIA runtime class exists: `kubectl get runtimeclass nvidia`
 
 ### Backend pod CrashLoopBackOff
-- Check logs: `kubectl logs -n tuiv -l app=tuiv-backend --previous`
+- Check logs: `kubectl logs -n tops -l app=tops-backend --previous`
 - The startup probe allows up to ~5 minutes for model loading — if it's crashing before that, it's likely an OOM or GPU issue
 
 ### LLM summarization fails
 - Test connectivity from the backend pod:
   ```bash
-  kubectl exec -n tuiv deploy/tuiv-backend -- curl -s https://api.aisc.hpi.de/health
+  kubectl exec -n tops deploy/tops-backend -- curl -s https://api.aisc.hpi.de/health
   ```
-- Check the API key is set: `kubectl get secret tuiv-secret -n tuiv -o yaml`
+- Check the API key is set: `kubectl get secret tops-secret -n tops -o yaml`
 
 ### Frontend returns 502 for API requests
 - The frontend nginx proxies to `http://backend:8010` — verify the backend service exists:
   ```bash
-  kubectl get svc backend -n tuiv
+  kubectl get svc backend -n tops
   ```
-- Check backend pod is ready: `kubectl get pods -n tuiv -l app=tuiv-backend`
+- Check backend pod is ready: `kubectl get pods -n tops -l app=tops-backend`
 
 ## Relationship to Docker Compose
 
