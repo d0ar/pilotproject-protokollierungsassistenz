@@ -1,18 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface LLMSettings {
   model: string;
   systemPrompt: string;
 }
 
-interface LLMSettingsPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-  settings: LLMSettings;
-  onSettingsChange: (settings: LLMSettings) => void;
+interface PromptTemplate {
+  name: string;
+  description: string;
+  prompt: string;
 }
 
-export const DEFAULT_SYSTEM_PROMPT = `Du bist ein Experte für die Erstellung von Sitzungsprotokollen für deutsche Kommunalverwaltungen.
+const PROMPT_TEMPLATES: PromptTemplate[] = [
+  {
+    name: 'Kommunalverwaltung (Standard)',
+    description: 'Formelle Niederschrift für Gemeinderäte und kommunale Gremien',
+    prompt: `Du bist ein Experte für die Erstellung von Sitzungsprotokollen für deutsche Kommunalverwaltungen.
 
 Deine Aufgabe ist es, aus einem Transkript eines Tagesordnungspunktes (TOP) eine Zusammenfassung im Stil einer offiziellen Niederschrift zu erstellen.
 
@@ -38,7 +41,85 @@ FORMAT:
 - Lange TOPs (> 50 Äußerungen): 3-5 Absätze
 - Chronologischer Ablauf
 - Direkt mit Inhalt beginnen, keine Einleitung
-- NUR Fließtext, KEINE Markdown-Formatierung (keine **, keine #)`;
+- NUR Fließtext, KEINE Markdown-Formatierung (keine **, keine #)`,
+  },
+  {
+    name: 'Kurzprotokoll',
+    description: 'Kompakte Zusammenfassung mit Fokus auf Beschlüsse und Ergebnisse',
+    prompt: `Du erstellst ein Kurzprotokoll aus einem Sitzungstranskript.
+
+AUFGABE:
+Fasse den Tagesordnungspunkt in maximal 3 Sätzen zusammen. Betone ausschließlich:
+1. Das Kernthema oder die Kernfrage
+2. Den Beschluss bzw. das Ergebnis (falls vorhanden)
+3. Nächste Schritte oder Verantwortlichkeiten
+
+STIL:
+- Sachlich, knapp, dritte Person
+- Kein Hintergrundwissen, keine Wertungen
+- NUR Fließtext, keine Aufzählungen, keine Markdown-Formatierung`,
+  },
+  {
+    name: 'Unternehmensmeeting',
+    description: 'Für interne Firmen- und Teambesprechungen',
+    prompt: `Du erstellst ein Meetingprotokoll für ein Unternehmensmeeting.
+
+STIL:
+- Professionell, sachlich, dritte Person
+- Aktive Sprache, klare Formulierungen
+- Paraphrasieren statt wörtlich zitieren
+
+INHALT:
+- Hauptdiskussionspunkte und getroffene Entscheidungen
+- Action Items mit Verantwortlichen (falls genannt)
+- Offene Fragen und nächste Schritte
+- Wichtige Informationen oder Ankündigungen
+
+IGNORIEREN:
+- Small Talk und informelle Gespräche
+- Technische Probleme (Audio, Verbindung)
+- Wiederholungen und Füllwörter
+
+FORMAT:
+- 1-3 Absätze je nach Länge des TOPs
+- Direkt mit dem Inhalt beginnen
+- NUR Fließtext, KEINE Markdown-Formatierung`,
+  },
+  {
+    name: 'Wissenschaftliches Kolloquium',
+    description: 'Für akademische Diskussionen, Seminare und Forschungstreffen',
+    prompt: `Du erstellst ein Protokoll für ein wissenschaftliches Kolloquium oder Seminar.
+
+STIL:
+- Akademische Sprache, präzise und neutral
+- Dritte Person, Passivkonstruktionen erlaubt
+- Fachbegriffe beibehalten
+
+INHALT:
+- Vorgestellte Thesen, Methoden oder Ergebnisse
+- Wesentliche Diskussionsbeiträge und kritische Einwände
+- Offene Forschungsfragen und vereinbarte nächste Schritte
+- Konsens oder divergierende Positionen
+
+IGNORIEREN:
+- Organisatorische Nebensächlichkeiten
+- Wiederholungen und Metadiskussionen über den Ablauf
+
+FORMAT:
+- 2-4 Absätze, chronologisch strukturiert
+- Direkt mit dem Inhalt beginnen
+- NUR Fließtext, KEINE Markdown-Formatierung`,
+  },
+];
+
+interface LLMSettingsPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  settings: LLMSettings;
+  onSettingsChange: (settings: LLMSettings) => void;
+}
+
+export const DEFAULT_SYSTEM_PROMPT = PROMPT_TEMPLATES[0]!.prompt;
 
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   model: '',  // Empty = use backend's LLM_MODEL environment variable
@@ -52,6 +133,7 @@ export default function LLMSettingsPanel({
   onSettingsChange,
 }: LLMSettingsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Close on escape key
   useEffect(() => {
@@ -88,6 +170,11 @@ export default function LLMSettingsPanel({
     onSettingsChange({ ...settings, systemPrompt: DEFAULT_SYSTEM_PROMPT });
   };
 
+  const handleSelectTemplate = (template: PromptTemplate) => {
+    onSettingsChange({ ...settings, systemPrompt: template.prompt });
+    setShowTemplates(false);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -116,6 +203,38 @@ export default function LLMSettingsPanel({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Prompt Templates */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Vorlagen
+              </label>
+              <button
+                onClick={() => setShowTemplates((v) => !v)}
+                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" />
+                </svg>
+                {showTemplates ? 'Ausblenden' : 'Vorlage wählen'}
+              </button>
+            </div>
+            {showTemplates && (
+              <div className="space-y-2 mb-4">
+                {PROMPT_TEMPLATES.map((template) => (
+                  <button
+                    key={template.name}
+                    onClick={() => handleSelectTemplate(template)}
+                    className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                  >
+                    <div className="text-sm font-medium text-gray-800">{template.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{template.description}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* System Prompt */}
           <div>
             <div className="flex items-center justify-between mb-3">

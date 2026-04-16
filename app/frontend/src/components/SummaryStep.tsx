@@ -121,6 +121,26 @@ export default function SummaryStep({
     URL.revokeObjectURL(url);
   };
 
+  const handleTranscriptExport = () => {
+    let content = 'TRANSKRIPT\n';
+    content += '='.repeat(50) + '\n\n';
+
+    transcript.forEach((line) => {
+      const name = getDisplayName(line.speaker);
+      content += `[${formatTime(line.start)}] ${name}: ${line.text}\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'transkript.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const topLines = getTranscriptForTop(selectedTop);
 
   return (
@@ -317,10 +337,16 @@ export default function SummaryStep({
           </div>
           <div className="flex gap-3">
             <button
+              onClick={handleTranscriptExport}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
+            >
+              📝 Transkript (.txt)
+            </button>
+            <button
               onClick={handleExport}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2"
             >
-              📄 Text (.txt)
+              📄 Protokoll (.txt)
             </button>
           </div>
         </div>
