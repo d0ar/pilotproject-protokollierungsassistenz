@@ -191,11 +191,30 @@ jobs:
     needs: [build-frontend, build-backend-gpu]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Trigger GitLab deploy pipeline
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update K8s manifests with new image tags
         run: |
-          curl -s --fail -X POST \
-          "https://gitlab.hpi.de/api/v4/projects/kisz%2Fprototypes%2Fprotokollierungsassistenz/trigger/pipeline" \
-          -F "token=${{ secrets.GITLAB_TRIGGER_TOKEN }}" \
-          -F "ref=main"
+          SHA_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          echo "Updating K8s manifests to tag: ${SHA_TAG}"
+
+          sed -i "s|image: .*/frontend:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${SHA_TAG}|" k8s/frontend/deployment.yaml
+          sed -i "s|image: .*/backend:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${SHA_TAG}-gpu|" k8s/backend/deployment.yaml
+
+      - name: Commit and push manifest changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --exit-code k8s/; then
+            echo "No changes to K8s manifests."
+          else
+            git add k8s/frontend/deployment.yaml k8s/backend/deployment.yaml
+            git commit -m "update k8s image tags to $(echo ${{ github.sha }} | cut -c1-7) [skip ci]"
+            git push
+          fi

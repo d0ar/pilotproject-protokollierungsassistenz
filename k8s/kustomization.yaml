@@ -10,4 +10,3 @@ resources:
   - backend/service.yaml
   - frontend/deployment.yaml
   - frontend/service.yaml
-  - ingress.yaml
