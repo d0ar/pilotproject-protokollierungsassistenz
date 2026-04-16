@@ -4,6 +4,7 @@ export interface LLMSettings {
   model: string;
   systemPrompt: string;
   batchSize: number;
+  numCtx: number;
 }
 
 interface PromptTemplate {
@@ -124,10 +125,13 @@ export const DEFAULT_SYSTEM_PROMPT = PROMPT_TEMPLATES[0]!.prompt;
 
 export const DEFAULT_BATCH_SIZE = 16;
 
+export const DEFAULT_NUM_CTX = 8192;
+
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   model: '',  // Empty = use backend's LLM_MODEL environment variable
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   batchSize: DEFAULT_BATCH_SIZE,
+  numCtx: DEFAULT_NUM_CTX,
 };
 
 export default function LLMSettingsPanel({
@@ -243,6 +247,25 @@ export default function LLMSettingsPanel({
           {/* Summarization Settings */}
           <div>
             <h3 className="text-sm font-semibold text-gray-800 mb-3">Zusammenfassung (KI)</h3>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-700">Kontextgröße (num_ctx)</label>
+                <input
+                  type="number"
+                  min={512}
+                  max={131072}
+                  step={512}
+                  value={settings.numCtx}
+                  onChange={(e: { target: { value: string } }) =>
+                    onSettingsChange({ ...settings, numCtx: Math.max(512, Number(e.target.value)) })
+                  }
+                  className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Maximale Anzahl an Tokens, die das LLM als Kontext verarbeitet. Erhöhen bei langen Transkripten (Standard: 8192).
+              </p>
+            </div>
           </div>
 
           {/* Prompt Templates */}

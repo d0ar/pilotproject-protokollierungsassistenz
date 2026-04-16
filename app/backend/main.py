@@ -158,6 +158,7 @@ class SummarizeRequest(BaseModel):
     lines: List[TranscriptLine]
     model: Optional[str] = None  # LLM model to use (e.g., "qwen3:8b")
     system_prompt: Optional[str] = None  # Custom system prompt
+    num_ctx: Optional[int] = None  # LLM context window size (tokens)
 
 
 class SummarizeResponse(BaseModel):
@@ -381,6 +382,7 @@ async def generate_summary(request: SummarizeRequest):
             text,
             model=request.model,
             system_prompt=request.system_prompt,
+            num_ctx=request.num_ctx,
         )
         return SummarizeResponse(
             summary=result.summary,

@@ -197,6 +197,7 @@ export default function App() {
         {
           model: llmSettings.model,
           systemPrompt: GENERIC_SUMMARY_PROMPT,
+          numCtx: llmSettings.numCtx,
         }
       );
       setSummaries({ 0: result.summary });
@@ -262,6 +263,7 @@ export default function App() {
             {
               model: llmSettings.model,
               systemPrompt: llmSettings.systemPrompt,
+              numCtx: llmSettings.numCtx,
             }
           );
           console.log(
@@ -346,6 +348,7 @@ export default function App() {
         {
           model: llmSettings.model,
           systemPrompt: prompt,
+          numCtx: llmSettings.numCtx,
         }
       );
       setSummaries((prev) => ({ ...prev, [topIndex]: result.summary }));

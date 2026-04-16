@@ -71,6 +71,7 @@ def summarize_segment(
     transcript_text: str,
     model: Optional[str] = None,
     system_prompt: Optional[str] = None,
+    num_ctx: Optional[int] = None,
 ) -> SummarizationResult:
     """
     Generate a summary for a meeting segment (TOP) using Ollama.
@@ -113,6 +114,10 @@ Transkript:
 
 Zusammenfassung:"""
 
+    extra_body = {}
+    if num_ctx is not None:
+        extra_body["options"] = {"num_ctx": num_ctx}
+
     start_time = time.time()
     response = client.chat.completions.create(
         model=actual_model,
@@ -122,6 +127,7 @@ Zusammenfassung:"""
         ],
         max_tokens=1024,
         temperature=0.3,  # Lower temperature for more consistent output
+        extra_body=extra_body if extra_body else None,
     )
     duration_seconds = time.time() - start_time
 

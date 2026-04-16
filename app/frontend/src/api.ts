@@ -89,6 +89,7 @@ export async function pollTranscription(
 export interface SummarizeOptions {
   model?: string;
   systemPrompt?: string;
+  numCtx?: number;
 }
 
 /**
@@ -117,6 +118,7 @@ export async function generateSummary(
       lines: lines,
       model: options?.model,
       system_prompt: options?.systemPrompt,
+      num_ctx: options?.numCtx,
     }),
   });
 
