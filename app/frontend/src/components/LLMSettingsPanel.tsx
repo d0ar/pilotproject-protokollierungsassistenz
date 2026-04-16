@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 export interface LLMSettings {
   model: string;
   systemPrompt: string;
+  batchSize: number;
 }
 
 interface PromptTemplate {

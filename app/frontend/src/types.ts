@@ -2,6 +2,8 @@
  * Shared type definitions for the Protokollierungsassistenz
  */
 
+import type { LLMSettings } from './components/LLMSettingsPanel';
+
 // API Types
 export interface TranscriptLine {
   speaker: string;
@@ -39,11 +41,6 @@ export interface StepIndicatorProps {
   currentStep: number;
 }
 
-export interface LLMSettings {
-  model: string;
-  systemPrompt: string;
-  batchSize: number;
-}
 
 export interface UploadStepProps {
   onNext: () => void;
