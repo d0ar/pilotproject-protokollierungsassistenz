@@ -125,7 +125,7 @@ export const DEFAULT_SYSTEM_PROMPT = PROMPT_TEMPLATES[0]!.prompt;
 
 export const DEFAULT_BATCH_SIZE = 16;
 
-export const DEFAULT_NUM_CTX = 8192;
+export const DEFAULT_NUM_CTX = 32768;
 
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   model: '',  // Empty = use backend's LLM_MODEL environment variable

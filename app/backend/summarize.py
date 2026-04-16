@@ -114,12 +114,7 @@ Transkript:
 
 Zusammenfassung:"""
 
-    extra_body = {}
-    if num_ctx is not None:
-        extra_body["options"] = {"num_ctx": num_ctx}
-
-    start_time = time.time()
-    response = client.chat.completions.create(
+    create_kwargs: dict = dict(
         model=actual_model,
         messages=[
             {"role": "system", "content": actual_system_prompt},
@@ -127,8 +122,12 @@ Zusammenfassung:"""
         ],
         max_tokens=1024,
         temperature=0.3,  # Lower temperature for more consistent output
-        extra_body=extra_body if extra_body else None,
     )
+    if num_ctx is not None:
+        create_kwargs["extra_body"] = {"options": {"num_ctx": num_ctx}}
+
+    start_time = time.time()
+    response = client.chat.completions.create(**create_kwargs)
     duration_seconds = time.time() - start_time
 
     summary = response.choices[0].message.content or ""
