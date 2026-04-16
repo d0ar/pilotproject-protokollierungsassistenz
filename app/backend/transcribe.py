@@ -179,6 +179,7 @@ def transcribe_audio(
     file_path: str,
     models: TranscriptionModels,
     progress_callback: Optional[Callable[[int, str], None]] = None,
+    batch_size: int = WHISPER_BATCH_SIZE,
 ) -> TranscriptionResult:
     """
     Transcribe audio file with speaker diarization using WhisperX.
@@ -214,10 +215,10 @@ def transcribe_audio(
             progress_callback(15, "Transkription läuft...")
 
         # Transcribe using pre-loaded model
-        logger.info(f"Starting transcription with batch_size={WHISPER_BATCH_SIZE}...")
+        logger.info(f"Starting transcription with batch_size={batch_size}...")
         result = models.whisper_model.transcribe(
             audio,
-            batch_size=WHISPER_BATCH_SIZE,
+            batch_size=batch_size,
             language=WHISPER_LANGUAGE,
         )
         logger.info(f"Transcription complete, found {len(result.get('segments', []))} segments")

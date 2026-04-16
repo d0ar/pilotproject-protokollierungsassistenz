@@ -7,13 +7,24 @@ import type { TranscriptLine, TranscriptionJob } from "./types";
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 /**
+ * Options for transcription.
+ */
+export interface TranscriptionOptions {
+  batchSize?: number;
+}
+
+/**
  * Start a transcription job by uploading an audio file.
  */
 export async function startTranscription(
-  audioFile: File
+  audioFile: File,
+  options?: TranscriptionOptions
 ): Promise<TranscriptionJob> {
   const formData = new FormData();
   formData.append("audio", audioFile);
+  if (options?.batchSize !== undefined) {
+    formData.append("batch_size", String(options.batchSize));
+  }
 
   const response = await fetch(`${API_BASE}/api/transcribe`, {
     method: "POST",

@@ -92,7 +92,11 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         // Don't use a model name from localStorage - let the backend decide via LLM_MODEL env var
-        return { ...parsed, model: '' };
+        return {
+          ...DEFAULT_LLM_SETTINGS,
+          ...parsed,
+          model: '',
+        };
       }
     } catch (e) {
       console.error("Failed to load LLM settings from localStorage:", e);
@@ -125,7 +129,9 @@ export default function App() {
 
     try {
       // Start transcription job
-      const job = await apiStartTranscription(audioFile);
+      const job = await apiStartTranscription(audioFile, {
+        batchSize: llmSettings.batchSize,
+      });
 
       // Store job ID for telemetry
       setJobId(job.job_id);

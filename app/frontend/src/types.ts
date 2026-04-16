@@ -42,6 +42,7 @@ export interface StepIndicatorProps {
 export interface LLMSettings {
   model: string;
   systemPrompt: string;
+  batchSize: number;
 }
 
 export interface UploadStepProps {

@@ -121,9 +121,12 @@ interface LLMSettingsPanelProps {
 
 export const DEFAULT_SYSTEM_PROMPT = PROMPT_TEMPLATES[0]!.prompt;
 
+export const DEFAULT_BATCH_SIZE = 16;
+
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
   model: '',  // Empty = use backend's LLM_MODEL environment variable
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  batchSize: DEFAULT_BATCH_SIZE,
 };
 
 export default function LLMSettingsPanel({
@@ -203,6 +206,44 @@ export default function LLMSettingsPanel({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Transcription Settings */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Transkription</h3>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Batch-Größe
+                </label>
+                <span className="text-sm font-mono text-blue-600">{settings.batchSize}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={32}
+                step={1}
+                value={settings.batchSize}
+                onChange={(e) =>
+                  onSettingsChange({ ...settings, batchSize: Number(e.target.value) })
+                }
+                className="w-full accent-blue-600"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                <span>1 (wenig RAM)</span>
+                <span>32 (schnell)</span>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Anzahl parallel verarbeiteter Audio-Segmente. Kleinere Werte reduzieren den Speicherbedarf, größere Werte beschleunigen die Transkription.
+              </p>
+            </div>
+          </div>
+
+          <hr className="border-gray-200" />
+
+          {/* Summarization Settings */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Zusammenfassung (KI)</h3>
+          </div>
+
           {/* Prompt Templates */}
           <div>
             <div className="flex items-center justify-between mb-2">

@@ -206,6 +206,7 @@ async def health_check():
 async def start_transcription(
     background_tasks: BackgroundTasks,
     audio: UploadFile = File(...),
+    batch_size: Optional[int] = Form(None),
 ):
     """
     Upload audio file and start transcription job.
@@ -252,8 +253,9 @@ async def start_transcription(
     cleanup_old_jobs()
 
     # Start background transcription - models will be loaded on demand
-    logger.info(f"Starting background transcription task for job: {job_id}")
-    background_tasks.add_task(run_transcription, job_id, str(file_path))
+    effective_batch_size = batch_size if batch_size is not None else WHISPER_BATCH_SIZE
+    logger.info(f"Starting background transcription task for job: {job_id} (batch_size={effective_batch_size})")
+    background_tasks.add_task(run_transcription, job_id, str(file_path), effective_batch_size)
 
     return TranscriptionJob(
         job_id=job_id,
@@ -516,7 +518,7 @@ async def report_session_complete(request: SessionCompleteRequest):
 # ----- Background Tasks -----
 
 
-def run_transcription(job_id: str, file_path: str):
+def run_transcription(job_id: str, file_path: str, batch_size: int = WHISPER_BATCH_SIZE):
     """
     Run transcription in background. Loads models on demand and unloads them afterward.
     """
@@ -542,7 +544,7 @@ def run_transcription(job_id: str, file_path: str):
             logger.info(f"[Job {job_id}] Progress: {remapped}% - {message}")
 
         transcription_start = time.time()
-        result = transcribe_audio(file_path, models, progress_callback)
+        result = transcribe_audio(file_path, models, progress_callback, batch_size=batch_size)
         transcription_duration = time.time() - transcription_start
 
         transcript = result.transcript
@@ -561,7 +563,7 @@ def run_transcription(job_id: str, file_path: str):
             "transcript_line_count": transcript_line_count,
             "transcript_char_count": transcript_char_count,
             "whisper_model": WHISPER_MODEL,
-            "whisper_batch_size": WHISPER_BATCH_SIZE,
+            "whisper_batch_size": batch_size,
         }
 
         logger.info(
