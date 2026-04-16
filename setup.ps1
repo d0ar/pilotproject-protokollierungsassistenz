@@ -653,6 +653,18 @@ function Invoke-Start {
     }
     Write-Host ""
 
+    # Always pull latest images to ensure municipalities get fixes
+    Write-Info "Pruefe auf Aktualisierungen..."
+    if ($script:USE_GPU) {
+        docker compose -f docker-compose.yml -f docker-compose.gpu.yml pull 2>&1 | Out-Null
+    } else {
+        docker compose pull 2>&1 | Out-Null
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Konnte nicht auf Updates pruefen - verwende lokale Images"
+    }
+    Write-Host ""
+
     if ($script:USE_GPU) {
         Write-Info "Starte im GPU-Modus..."
         docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d

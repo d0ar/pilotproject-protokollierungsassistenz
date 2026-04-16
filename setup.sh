@@ -649,6 +649,15 @@ do_start() {
     fi
     echo ""
 
+    # Always pull latest images to ensure municipalities get fixes
+    info "Pruefe auf Aktualisierungen..."
+    if [ "$USE_GPU" = true ]; then
+        docker compose -f docker-compose.yml -f docker-compose.gpu.yml pull 2>/dev/null || warn "Konnte nicht auf Updates pruefen - verwende lokale Images"
+    else
+        docker compose pull 2>/dev/null || warn "Konnte nicht auf Updates pruefen - verwende lokale Images"
+    fi
+    echo ""
+
     if [ "$USE_GPU" = true ]; then
         info "Starte im GPU-Modus..."
         docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d

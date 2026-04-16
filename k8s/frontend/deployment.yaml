@@ -21,7 +21,9 @@ spec:
             - containerPort: 80
           env:
             - name: NGINX_RESOLVER
-              value: "kube-dns.kube-system.svc.cluster.local"
+              value: "rke2-coredns-rke2-coredns.kube-system.svc.k8s.test.sci.hpi.de"
+            - name: NGINX_BACKEND
+              value: "backend.tops.svc.cluster.local:8010"
           readinessProbe:
             httpGet:
               path: /
