@@ -296,11 +296,11 @@ def transcribe_audio(
 
 def parse_transcript_file(file_path: str) -> List[Dict[str, str]]:
     """
-    Parse existing transcript file in [SPEAKER_XX]: text format.
+    Parse existing transcript file in [SXX]: text format.
     Useful for loading pre-generated transcripts.
     """
     transcript = []
-    pattern = r"\[SPEAKER_(\d+)\]:\s*(.+)"
+    pattern = r"\[S(\d+)\]:\s*(.+)"
 
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -314,7 +314,7 @@ def parse_transcript_file(file_path: str) -> List[Dict[str, str]]:
                 text = match.group(2).strip()
                 if text:
                     transcript.append({
-                        "speaker": f"SPEAKER_{speaker_id}",
+                        "speaker": f"S{speaker_id}",
                         "text": text,
                     })
 
