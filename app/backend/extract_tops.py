@@ -159,6 +159,7 @@ TOPs:"""
             ],
             max_tokens=2048,
             temperature=0.1,  # Very low temperature for consistent extraction
+            extra_body={"options": {"think": False}},  # Disable thinking tokens (Qwen3+)
         )
 
         raw_response = response.choices[0].message.content or ""
@@ -193,6 +194,9 @@ def parse_tops_response(response_text: str) -> list[str]:
     Returns:
         List of TOP titles (with numbering stripped)
     """
+    # Strip thinking tokens (e.g. from Qwen3 models with reasoning enabled)
+    response_text = re.sub(r"<think>.*?</think>", "", response_text, flags=re.DOTALL)
+
     tops = []
     lines = response_text.strip().split("\n")
 
