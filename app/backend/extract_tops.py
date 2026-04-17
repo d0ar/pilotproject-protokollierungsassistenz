@@ -125,48 +125,40 @@ def extract_tops_from_text(
         List of TOP titles (including numbering)
 
     Raises:
-        RuntimeError: If OpenAI client is not installed or LLM call fails
+        RuntimeError: If LLM call fails
     """
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise RuntimeError(
-            "OpenAI client nicht installiert. Installieren Sie mit: uv add openai"
-        )
-
     actual_model = model or LLM_MODEL
     actual_system_prompt = system_prompt or DEFAULT_EXTRACTION_PROMPT
 
     logger.info(f"Extracting TOPs using model: {actual_model}")
 
-    client = OpenAI(
-        base_url=LLM_BASE_URL,
-        api_key=LLM_API_KEY,
-    )
-
-    user_prompt = f"""/no_think
-Extrahiere alle Tagesordnungspunkte aus diesem Einladungsdokument:
+    user_prompt = f"""Extrahiere alle Tagesordnungspunkte aus diesem Einladungsdokument:
 
 {pdf_text}
 
 TOPs:"""
 
     try:
-        response = client.chat.completions.create(
-            model=actual_model,
-            messages=[
-                {"role": "system", "content": actual_system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=8192,
-            temperature=0.1,  # Very low temperature for consistent extraction
+        # Use native Ollama API so that think=false is reliably supported
+        response = requests.post(
+            f"{_OLLAMA_NATIVE_URL}/api/chat",
+            json={
+                "model": actual_model,
+                "messages": [
+                    {"role": "system", "content": actual_system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "think": False,
+                "stream": False,
+                "options": {"temperature": 0.1, "num_predict": 2048},
+            },
+            timeout=300,
         )
+        response.raise_for_status()
+        data = response.json()
 
-        choice = response.choices[0]
-        raw_response = choice.message.content or ""
-        logger.info(f"LLM raw response ({actual_model}) content:\n{raw_response!r}")
-        logger.info(f"LLM message fields: {vars(choice.message)}")
-        logger.info(f"LLM finish_reason: {choice.finish_reason}")
+        raw_response = data.get("message", {}).get("content", "")
+        logger.info(f"LLM raw response ({actual_model}):\n{raw_response}")
 
         # Parse the response into individual TOPs
         tops = parse_tops_response(raw_response)
