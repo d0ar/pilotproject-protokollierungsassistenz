@@ -20,9 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     wget \
+    nano \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.10 /usr/bin/python \
-    && ln -sf /usr/bin/python3.10 /usr/bin/python3
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 
 
 # Upgrade pip
 RUN python -m pip install --upgrade pip
