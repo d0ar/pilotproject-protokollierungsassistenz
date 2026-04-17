@@ -163,7 +163,7 @@ TOPs:"""
         )
 
         raw_response = response.choices[0].message.content or ""
-        logger.debug(f"LLM response:\n{raw_response}")
+        logger.info(f"LLM raw response ({actual_model}):\n{raw_response}")
 
         # Parse the response into individual TOPs
         tops = parse_tops_response(raw_response)
