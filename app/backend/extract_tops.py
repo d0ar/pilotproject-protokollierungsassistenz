@@ -159,7 +159,6 @@ TOPs:"""
             ],
             max_tokens=2048,
             temperature=0.1,  # Very low temperature for consistent extraction
-            extra_body={"options": {"think": False}},  # Disable thinking tokens (Qwen3+)
         )
 
         raw_response = response.choices[0].message.content or ""
