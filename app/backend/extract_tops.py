@@ -144,7 +144,8 @@ def extract_tops_from_text(
         api_key=LLM_API_KEY,
     )
 
-    user_prompt = f"""Extrahiere alle Tagesordnungspunkte aus diesem Einladungsdokument:
+    user_prompt = f"""/no_think
+Extrahiere alle Tagesordnungspunkte aus diesem Einladungsdokument:
 
 {pdf_text}
 
@@ -157,12 +158,15 @@ TOPs:"""
                 {"role": "system", "content": actual_system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=2048,
+            max_tokens=8192,
             temperature=0.1,  # Very low temperature for consistent extraction
         )
 
-        raw_response = response.choices[0].message.content or ""
-        logger.info(f"LLM raw response ({actual_model}):\n{raw_response}")
+        choice = response.choices[0]
+        raw_response = choice.message.content or ""
+        logger.info(f"LLM raw response ({actual_model}) content:\n{raw_response!r}")
+        logger.info(f"LLM message fields: {vars(choice.message)}")
+        logger.info(f"LLM finish_reason: {choice.finish_reason}")
 
         # Parse the response into individual TOPs
         tops = parse_tops_response(raw_response)
