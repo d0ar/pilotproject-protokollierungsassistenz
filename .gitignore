@@ -16,3 +16,5 @@ uploads/
 # Kubernetes secrets (keep example templates)
 k8s/secrets/*.yaml
 !k8s/secrets/example-secret.yaml
+!k8s/secrets/sealed-secret.yaml
+
