@@ -128,7 +128,7 @@ export const DEFAULT_BATCH_SIZE = 16;
 export const DEFAULT_NUM_CTX = 32768;
 
 export const DEFAULT_LLM_SETTINGS: LLMSettings = {
-  model: '',  // Empty = use backend's LLM_MODEL environment variable
+  model: '',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   batchSize: DEFAULT_BATCH_SIZE,
   numCtx: DEFAULT_NUM_CTX,

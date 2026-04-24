@@ -28,6 +28,10 @@ COPY nginx.conf /etc/nginx/templates/default.conf.template
 # Override via env var for other environments (e.g. Kubernetes sets kube-dns)
 ENV NGINX_RESOLVER=127.0.0.11
 
+# Default backend address: Docker Compose service name
+# Override for K8s with FQDN (e.g. backend.tops.svc.cluster.local:8010)
+ENV NGINX_BACKEND=backend:8010
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
