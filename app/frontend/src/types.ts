@@ -49,6 +49,8 @@ export interface UploadStepProps {
   tops: string[];
   setTops: (tops: string[]) => void;
   llmSettings?: LLMSettings;
+  transcriptOnly: boolean;
+  setTranscriptOnly: (value: boolean) => void;
 }
 
 export interface ProcessingStepProps {
@@ -79,6 +81,7 @@ export interface SummaryStepProps {
   isGenerating: boolean;
   audioUrl?: string;  // URL to stream audio for playback
   speakerNames: Record<string, string>;
+  transcriptOnly?: boolean;
 }
 
 // Color palette type for TOPs

@@ -71,6 +71,7 @@ export default function App() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [skippedAssignment, setSkippedAssignment] = useState(false);
+  const [transcriptOnly, setTranscriptOnly] = useState(false);
 
   // Helper to apply speaker name mappings to transcript lines for summarization
   const applySpeakerNames = (lines: TranscriptLine[]): TranscriptLine[] => {
@@ -159,7 +160,12 @@ export default function App() {
 
       // Check if TOPs were defined
       const hasTops = tops.some((t) => t.trim() !== "");
-      if (hasTops) {
+      if (transcriptOnly) {
+        // Transcript-only mode: skip assignment and summarization
+        setSkippedAssignment(true);
+        setAssignments(new Array(transcriptResult.length).fill(0));
+        setCurrentStep(3);
+      } else if (hasTops) {
         // Normal flow: go to assignment step
         setSkippedAssignment(false);
         setAssignments(new Array(transcriptResult.length).fill(null));
@@ -317,8 +323,8 @@ export default function App() {
   };
 
   const handleStep3Back = () => {
-    if (skippedAssignment) {
-      // Go back to upload step, reset auto-created TOP
+    if (transcriptOnly || skippedAssignment) {
+      // Go back to upload step
       setCurrentStep(1);
       setTops(["", "", ""]);
       setTranscript([]);
@@ -417,6 +423,8 @@ export default function App() {
           tops={tops}
           setTops={setTops}
           llmSettings={llmSettings}
+          transcriptOnly={transcriptOnly}
+          setTranscriptOnly={setTranscriptOnly}
         />
       ) : currentStep === 2 ? (
         <AssignmentStep
@@ -442,6 +450,7 @@ export default function App() {
           isGenerating={isGeneratingSummary}
           audioUrl={audioUrl ?? undefined}
           speakerNames={speakerNames}
+          transcriptOnly={transcriptOnly}
         />
       )}
     </Layout>

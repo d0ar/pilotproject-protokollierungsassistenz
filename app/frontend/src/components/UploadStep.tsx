@@ -9,6 +9,8 @@ export default function UploadStep({
   tops,
   setTops,
   llmSettings,
+  transcriptOnly,
+  setTranscriptOnly,
 }: UploadStepProps) {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -345,7 +347,22 @@ export default function UploadStep({
       </div>
 
       {/* Action Button */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => setTranscriptOnly(!transcriptOnly)}
+            className={`relative w-10 h-6 rounded-full transition-colors ${
+              transcriptOnly ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          >
+            <div
+              className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                transcriptOnly ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </div>
+          <span className="text-sm text-gray-700">Nur Transkript (ohne Protokollierung)</span>
+        </label>
         <button
           onClick={onNext}
           disabled={!canProceed}

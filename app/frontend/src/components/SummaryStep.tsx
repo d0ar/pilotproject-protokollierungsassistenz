@@ -20,6 +20,7 @@ export default function SummaryStep({
   isGenerating,
   audioUrl,
   speakerNames,
+  transcriptOnly,
 }: SummaryStepProps) {
   const [selectedTop, setSelectedTop] = useState(0);
   const [editingTop, setEditingTop] = useState<number | null>(null);
@@ -142,6 +143,74 @@ export default function SummaryStep({
   };
 
   const topLines = getTranscriptForTop(selectedTop);
+
+  // Transcript-only mode: simplified view without summarization
+  if (transcriptOnly) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col" style={{ height: '600px' }}>
+          {audioUrl && (
+            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <AudioPlayer
+                audioUrl={audioUrl}
+                currentTime={seekTime}
+                onTimeUpdate={handleTimeUpdate}
+              />
+            </div>
+          )}
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <h3 className="font-medium text-gray-900">
+              Transkript ({transcript.length} Zeilen)
+              {audioUrl && <span className="text-gray-400 font-normal text-sm"> - Doppelklick zum Abspielen</span>}
+            </h3>
+          </div>
+          <div ref={transcriptContainerRef} className="flex-1 overflow-y-auto p-4 text-sm space-y-1">
+            {transcript.map((line, index) => {
+              const isCurrentLine = index === currentLineIndex;
+              return (
+                <div
+                  key={index}
+                  onDoubleClick={() => handleLineDoubleClick(line)}
+                  className={`px-2 py-1 rounded cursor-pointer hover:bg-gray-100 ${
+                    isCurrentLine ? 'ring-2 ring-blue-500 ring-offset-1 bg-blue-50' : ''
+                  }`}
+                >
+                  <span className="font-medium text-gray-500">{getDisplayName(line.speaker)}:</span>{' '}
+                  <span className="text-gray-700">{line.text}</span>
+                  <span className="ml-2 text-xs text-gray-400">[{formatTime(line.start)}]</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium text-gray-900">Export</h3>
+              <p className="text-sm text-gray-500">Transkript als Datei herunterladen</p>
+            </div>
+            <button
+              onClick={handleTranscriptExport}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              📝 Transkript (.txt)
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-start">
+          <button
+            onClick={onBack}
+            className="px-6 py-3 rounded-lg font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-2"
+          >
+            <span>←</span>
+            Zurück zum Upload
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
