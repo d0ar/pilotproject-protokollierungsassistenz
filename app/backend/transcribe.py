@@ -263,7 +263,12 @@ def transcribe_audio(
         transcript = []
         raw_segment_count = len(result["segments"])
         for segment in result["segments"]:
-            speaker = segment.get("speaker", "UNKNOWN")
+            raw_speaker = segment.get("speaker", "UNKNOWN")
+            # pyannote outputs "SPEAKER_XX" — normalize to "SXX"
+            if raw_speaker.startswith("SPEAKER_"):
+                speaker = "S" + raw_speaker[len("SPEAKER_"):]
+            else:
+                speaker = raw_speaker
             text = segment.get("text", "").strip()
             if text:
                 # Merge with previous segment if same speaker
