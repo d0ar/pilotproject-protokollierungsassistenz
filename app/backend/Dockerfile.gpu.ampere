@@ -1,0 +1,96 @@
+# Backend Dockerfile for GPU deployment with NVIDIA CUDA support and pre-bundled ML models
+# Targets Ampere architecture (sm_86) — tested with RTX 3090
+# Requires: NVIDIA GPU, NVIDIA Container Toolkit installed on host
+#
+# Build: docker build -f Dockerfile.gpu --build-arg HF_TOKEN=your_token -t backend:gpu .
+# Run: docker run --gpus all -p 8010:8010 backend:gpu
+
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Install Python 3.10 and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-venv \
+    python3-pip \
+    ffmpeg \
+    curl \
+    git \
+    wget \
+    nano \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3
+
+# Upgrade pip
+RUN python -m pip install --upgrade pip
+
+# Install uv for package management
+RUN pip install uv
+
+# Copy project files
+COPY pyproject.toml ./
+COPY *.py ./
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Install PyTorch 2.7.0 with CUDA 12.4 support for sm_86 (RTX 3090/Ampere)
+# Pin to 2.7.x/2.8.x because torchaudio >=2.9 removed AudioMetaData, which pyannote-audio (WhisperX dep) still needs
+RUN pip install torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
+
+# Install remaining dependencies using uv for better dependency resolution
+# Note: torch is already installed above, so uv will use the existing installation
+RUN uv pip install --system -e .
+
+# Install nvidia-cudnn-cu12 for WhisperX GPU support
+# This provides the cuDNN libraries needed for faster-whisper
+RUN pip install nvidia-cudnn-cu12
+
+# Set CUDA library paths for Ampere GPUs
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV CUDA_HOME=/usr/local/cuda
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV CUDA_MODULE_LOADING=LAZY
+
+# Additional library path for cuDNN
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+
+# Build argument for HuggingFace token (used only during build to download models)
+ARG HF_TOKEN
+# Make ARG available as environment variable for Python to read
+ENV HF_TOKEN=${HF_TOKEN}
+
+# Set cache directories inside the container
+ENV HF_HOME=/app/.cache/huggingface
+ENV TORCH_HOME=/app/.cache/torch
+
+# Download all ML models at build time (using CPU mode - models are architecture-agnostic)
+# This eliminates the need for HF_TOKEN at runtime
+# Reuses the load_models() function from transcribe.py
+RUN python -c "from transcribe import load_models; load_models()"
+
+# Clear the HF_TOKEN from environment (security: don't leak token in final image)
+ENV HF_TOKEN=
+
+# Set flag indicating models are pre-cached (runtime won't require HF_TOKEN)
+ENV MODELS_PRECACHED=1
+
+# Telemetry webhook URL (injected at build time from GitHub secret)
+ARG TELEMETRY_WEBHOOK_URL
+ENV TELEMETRY_WEBHOOK_URL=${TELEMETRY_WEBHOOK_URL:-}
+
+# Expose port
+EXPOSE 8010
+
+# Health check with reduced start_period since models are pre-loaded
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=120s \
+    CMD curl -f http://localhost:8010/health || exit 1
+
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"]
