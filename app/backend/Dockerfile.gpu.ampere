@@ -5,7 +5,7 @@
 # Build: docker build -f Dockerfile.gpu --build-arg HF_TOKEN=your_token -t backend:gpu .
 # Run: docker run --gpus all -p 8010:8010 backend:gpu
 
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -39,9 +39,10 @@ COPY *.py ./
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Install PyTorch 2.7.0 with CUDA 12.4 support for sm_86 (RTX 3090/Ampere)
+# Install PyTorch 2.7.0 with CUDA 12.6 support for sm_86 (RTX 3090/Ampere)
+# cu124 wheels only go up to 2.6.0; torch 2.7.0 requires cu126
 # Pin to 2.7.x/2.8.x because torchaudio >=2.9 removed AudioMetaData, which pyannote-audio (WhisperX dep) still needs
-RUN pip install torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu126
 
 # Install remaining dependencies using uv for better dependency resolution
 # Note: torch is already installed above, so uv will use the existing installation
