@@ -39,11 +39,14 @@ COPY *.py ./
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Install PyTorch 2.7.0 with CUDA 12.6 support for sm_86 (RTX 3090/Ampere)
+# Install PyTorch 2.8.0 with CUDA 12.6 support for sm_86 (RTX 3090/Ampere)
 # Must install before uv so uv reuses this install instead of pulling from PyPI.
 # PyPI torch wheels bundle different CUDA libs that conflict with CTranslate2.
-# Pin to 2.7.x because torchaudio >=2.9 removed AudioMetaData (pyannote-audio dep)
-RUN pip install torch==2.7.0 torchaudio==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu126
+# torchvision 0.22.0 (for torch 2.7.0) has a circular import bug in _meta_registrations.py
+# that crashes at import time via pyannote→pytorch_lightning→torchmetrics→torchvision.
+# torchvision 0.23.0 (torch 2.8.0) has the fix. torch 2.8.0 supports Ampere via cu126.
+# Pin to 2.8.x because torchaudio >=2.9 removed AudioMetaData (pyannote-audio dep)
+RUN pip install torch==2.8.0 torchaudio==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu126
 
 # Install remaining dependencies using uv (torch already installed above)
 RUN uv pip install --system -e .
