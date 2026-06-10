@@ -43,20 +43,20 @@ RUN mkdir -p uploads
 # Note: torch will automatically use CUDA when available
 RUN uv pip install --system -e .
 
-# Install nvidia-cudnn-cu12 for WhisperX GPU support
-# This provides the cuDNN libraries needed for faster-whisper
-RUN pip install nvidia-cudnn-cu12
+# Install NVIDIA CUDA libraries for CTranslate2/faster-whisper GPU support
+# nvidia-cublas-cu12: required by CTranslate2 (libcublas not included in cuda-runtime base image)
+# nvidia-cudnn-cu12: required by faster-whisper for cuDNN
+RUN pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
 
 # Set CUDA library paths for Ampere GPUs
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV CUDA_HOME=/usr/local/cuda
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV CUDA_MODULE_LOADING=LAZY
 
-# cuDNN path for WhisperX/faster-whisper
+# Include CUDA runtime, cuBLAS and cuDNN libs so CTranslate2/faster-whisper can find them
 # See: https://github.com/m-bain/whisperX/issues/902
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/lib/python3.10/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
 
 # Build argument for HuggingFace token (used only during build to download models)
 ARG HF_TOKEN
