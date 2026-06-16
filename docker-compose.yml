@@ -7,7 +7,7 @@
 
 services:
   frontend:
-    image: ghcr.io/aihpi/pilotproject-protokollierungsassistenz/frontend:latest
+    image: ${IMAGE_PREFIX:-ghcr.io/aihpi/pilotproject-protokollierungsassistenz}/frontend:latest
     ports:
       - "3000:80"
     depends_on:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/aihpi/pilotproject-protokollierungsassistenz/backend:cpu-latest
+    image: ${IMAGE_PREFIX:-ghcr.io/aihpi/pilotproject-protokollierungsassistenz}/backend:cpu-latest
     ports:
       - "8010:8010"
     environment:

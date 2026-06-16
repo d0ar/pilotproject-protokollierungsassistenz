@@ -24,10 +24,14 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Docker image registry prefix (change this if using a fork)
+IMAGE_PREFIX="ghcr.io/d0ar/pilotproject-protokollierungsassistenz"
+
 # Docker images
-FRONTEND_IMAGE="ghcr.io/aihpi/pilotproject-protokollierungsassistenz/frontend:latest"
-BACKEND_CPU_IMAGE="ghcr.io/aihpi/pilotproject-protokollierungsassistenz/backend:cpu-latest"
-BACKEND_GPU_IMAGE="ghcr.io/aihpi/pilotproject-protokollierungsassistenz/backend:gpu-latest"
+FRONTEND_IMAGE="${IMAGE_PREFIX}/frontend:latest"
+BACKEND_CPU_IMAGE="${IMAGE_PREFIX}/backend:cpu-latest"
+BACKEND_GPU_TAG="gpu-latest"          # overwritten by check_gpu() based on architecture
+BACKEND_GPU_IMAGE="${IMAGE_PREFIX}/backend:${BACKEND_GPU_TAG}"
 OLLAMA_IMAGE="ollama/ollama:latest"
 OLLAMA_MODEL="${LLM_MODEL:-qwen3:8b}"
 
@@ -470,7 +474,21 @@ check_gpu() {
 
                 if [ "$nvidia_docker_found" = true ]; then
                     USE_GPU=true
-                    success "GPU-Modus aktiviert"
+
+                    # Detect GPU architecture via compute capability
+                    local compute_cap compute_major
+                    compute_cap=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d '[:space:]')
+                    compute_major=$(echo "$compute_cap" | cut -d'.' -f1)
+
+                    if [ -n "$compute_major" ] && [ "$compute_major" -ge 12 ] 2>/dev/null; then
+                        BACKEND_GPU_TAG="gpu-blackwell-latest"
+                        BACKEND_GPU_IMAGE="${IMAGE_PREFIX}/backend:${BACKEND_GPU_TAG}"
+                        success "GPU-Modus aktiviert (Blackwell, compute ${compute_cap})"
+                    else
+                        BACKEND_GPU_TAG="gpu-latest"
+                        BACKEND_GPU_IMAGE="${IMAGE_PREFIX}/backend:${BACKEND_GPU_TAG}"
+                        success "GPU-Modus aktiviert (Ampere, compute ${compute_cap:-?})"
+                    fi
                 else
                     warn "NVIDIA Container Toolkit nicht erkannt"
                     echo ""
@@ -632,10 +650,10 @@ do_start() {
     # Pre-flight checks
     check_docker || exit 1
     check_existing_installation || exit 1
+    check_gpu
     check_disk_space || exit 1
     check_ram
     check_ports || exit 1
-    check_gpu
 
     # Create uploads directory
     mkdir -p uploads
@@ -648,6 +666,10 @@ do_start() {
         echo "Downloads koennen einige Minuten dauern."
     fi
     echo ""
+
+    # Export variables picked up by docker compose
+    export IMAGE_PREFIX
+    export BACKEND_GPU_TAG
 
     # Always pull latest images to ensure municipalities get fixes
     info "Pruefe auf Aktualisierungen..."
