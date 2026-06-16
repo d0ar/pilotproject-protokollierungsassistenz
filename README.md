@@ -52,7 +52,7 @@ Download the application from GitHub:
 
 Laden Sie die Anwendung von GitHub herunter:
 
-1. Go to: **https://github.com/aihpi/pilotproject-protokollierungsassistenz**
+1. Go to: **https://github.com/d0ar/pilotproject-protokollierungsassistenz**
 2. Click the green **"Code"** button
 3. Click **"Download ZIP"**
 4. Save the file to your computer (e.g., Downloads folder)
@@ -252,7 +252,7 @@ Haben Sie einen Fehler gefunden? Haben Sie einen Funktionswunsch? Wir freuen uns
 
 ### How to Report an Issue
 
-1. Go to: **https://github.com/aihpi/pilotproject-protokollierungsassistenz/issues**
+1. Go to: **https://github.com/d0ar/pilotproject-protokollierungsassistenz/issues**
 2. Click **"New Issue"**
 3. Include the following information:
    - Your operating system (Windows/macOS/Linux)
@@ -299,9 +299,10 @@ protokollierungsassistenz/
 
 Docker images are automatically built and published to GitHub Container Registry:
 
-- `ghcr.io/aihpi/pilotproject-protokollierungsassistenz/frontend:latest`
-- `ghcr.io/aihpi/pilotproject-protokollierungsassistenz/backend:cpu-latest`
-- `ghcr.io/aihpi/pilotproject-protokollierungsassistenz/backend:gpu-latest`
+- `ghcr.io/d0ar/pilotproject-protokollierungsassistenz/frontend:latest`
+- `ghcr.io/d0ar/pilotproject-protokollierungsassistenz/backend:cpu-latest`
+- `ghcr.io/d0ar/pilotproject-protokollierungsassistenz/backend:gpu-latest` (NVIDIA Ampere, e.g. RTX 3090)
+- `ghcr.io/d0ar/pilotproject-protokollierungsassistenz/backend:gpu-blackwell-latest` (NVIDIA Blackwell, e.g. RTX 5090)
 
 These images include all ML models pre-bundled, so no HuggingFace token is required for end users.
 
@@ -359,8 +360,11 @@ To build images locally (requires HuggingFace token):
 # CPU image
 docker build --build-arg HF_TOKEN=$HF_TOKEN -t backend:cpu ./app/backend
 
-# GPU image
-docker build -f Dockerfile.gpu --build-arg HF_TOKEN=$HF_TOKEN -t backend:gpu ./app/backend
+# GPU image (Ampere, e.g. RTX 3090)
+docker build -f app/backend/Dockerfile.gpu.ampere --build-arg HF_TOKEN=$HF_TOKEN -t backend:gpu-ampere ./app/backend
+
+# GPU image (Blackwell, e.g. RTX 5090)
+docker build -f app/backend/Dockerfile.gpu.blackwell --build-arg HF_TOKEN=$HF_TOKEN -t backend:gpu-blackwell ./app/backend
 ```
 
 ### Environment Variables
