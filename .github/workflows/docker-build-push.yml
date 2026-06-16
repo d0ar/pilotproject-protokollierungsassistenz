@@ -2,7 +2,8 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*"
   workflow_dispatch:
 
 env:
@@ -33,7 +34,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/frontend:latest
-            ${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/frontend:${{ github.ref_name }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
@@ -61,7 +62,7 @@ jobs:
   #         push: true
   #         tags: |
   #           ${{ env.IMAGE_PREFIX }}/backend:cpu-latest
-  #           ${{ env.IMAGE_PREFIX }}/backend:cpu-${{ github.sha }}
+  #           ${{ env.IMAGE_PREFIX }}/backend:cpu-${{ github.ref_name }}
   #         build-args: |
   #           HF_TOKEN=${{ secrets.HF_TOKEN }}
   #           TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
@@ -92,7 +93,7 @@ jobs:
   #         push: true
   #         tags: |
   #           ${{ env.IMAGE_PREFIX }}/backend:gpu-latest
-  #           ${{ env.IMAGE_PREFIX }}/backend:gpu-ampere-${{ github.sha }}
+  #           ${{ env.IMAGE_PREFIX }}/backend:gpu-ampere-${{ github.ref_name }}
   #         build-args: |
   #           HF_TOKEN=${{ secrets.HF_TOKEN }}
   #           TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
@@ -123,7 +124,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/backend:gpu-blackwell-latest
-            ${{ env.IMAGE_PREFIX }}/backend:gpu-blackwell-${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/backend:gpu-blackwell-${{ github.ref_name }}
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             TELEMETRY_WEBHOOK_URL=${{ secrets.TELEMETRY_WEBHOOK_URL }}
