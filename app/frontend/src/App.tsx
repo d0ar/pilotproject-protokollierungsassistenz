@@ -314,6 +314,39 @@ export default function App() {
     }
   };
 
+  const handleSplitAndAssign = (lineIndex: number, startChar: number, endChar: number, topIndex: number) => {
+    const line = transcript[lineIndex];
+    if (!line) return;
+
+    const currentAssignment = assignments[lineIndex] ?? null;
+    const totalChars = line.text.length;
+    const duration = line.end - line.start;
+
+    const newLines: TranscriptLine[] = [];
+    const newAssignments: (number | null)[] = [];
+
+    if (startChar > 0) {
+      newLines.push({ ...line, text: line.text.slice(0, startChar), end: line.start + (startChar / totalChars) * duration });
+      newAssignments.push(currentAssignment);
+    }
+
+    newLines.push({
+      ...line,
+      text: line.text.slice(startChar, endChar),
+      start: line.start + (startChar / totalChars) * duration,
+      end: line.start + (endChar / totalChars) * duration,
+    });
+    newAssignments.push(topIndex);
+
+    if (endChar < totalChars) {
+      newLines.push({ ...line, text: line.text.slice(endChar), start: line.start + (endChar / totalChars) * duration });
+      newAssignments.push(currentAssignment);
+    }
+
+    setTranscript([...transcript.slice(0, lineIndex), ...newLines, ...transcript.slice(lineIndex + 1)]);
+    setAssignments([...assignments.slice(0, lineIndex), ...newAssignments, ...assignments.slice(lineIndex + 1)]);
+  };
+
   const handleStep2Back = () => {
     setCurrentStep(1);
     setTranscript([]);
@@ -437,6 +470,7 @@ export default function App() {
           audioUrl={audioUrl ?? undefined}
           speakerNames={speakerNames}
           setSpeakerNames={setSpeakerNames}
+          onSplitAndAssign={handleSplitAndAssign}
         />
       ) : (
         <SummaryStep

@@ -4,6 +4,14 @@ import AudioPlayer from './AudioPlayer';
 import { useAudioSync } from '../hooks/useAudioSync';
 import SpeakerNameEditor from './SpeakerNameEditor';
 
+interface SelectionPopup {
+  lineIndex: number;
+  startChar: number;
+  endChar: number;
+  x: number;
+  y: number;
+}
+
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
@@ -32,9 +40,11 @@ export default function AssignmentStep({
   audioUrl,
   speakerNames,
   setSpeakerNames,
+  onSplitAndAssign,
 }: AssignmentStepProps) {
   const [selectedTop, setSelectedTop] = useState(0);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionPopup, setSelectionPopup] = useState<SelectionPopup | null>(null);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
 
   // Audio sync hook
@@ -71,7 +81,41 @@ export default function AssignmentStep({
 
   const counts = getAssignmentCounts();
 
+  // Dismiss popup when clicking outside it
+  useEffect(() => {
+    if (!selectionPopup) return;
+    const dismiss = () => setSelectionPopup(null);
+    document.addEventListener('mousedown', dismiss);
+    return () => document.removeEventListener('mousedown', dismiss);
+  }, [selectionPopup]);
+
+  const handleTextMouseUp = (lineIndex: number, event: MouseEvent<HTMLSpanElement>) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+
+    const selectedText = selection.toString();
+    if (!selectedText.trim()) return;
+
+    const range = selection.getRangeAt(0);
+    const span = event.currentTarget;
+
+    if (!span.contains(range.startContainer) || !span.contains(range.endContainer)) return;
+
+    const startChar = Math.min(range.startOffset, range.endOffset);
+    const endChar = Math.max(range.startOffset, range.endOffset);
+    if (startChar >= endChar) return;
+
+    // Prevent the parent div's onClick from also firing
+    event.stopPropagation();
+
+    setSelectionPopup({ lineIndex, startChar, endChar, x: event.clientX, y: event.clientY });
+  };
+
   const handleLineClick = (lineIndex: number, event: MouseEvent<HTMLDivElement>) => {
+    // Ignore click if user just made a text selection (popup is shown)
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+
     // Double-click to seek audio
     const line = transcript[lineIndex];
     if (event.detail === 2 && audioUrl && line) {
@@ -111,9 +155,7 @@ export default function AssignmentStep({
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-blue-800 text-sm">
-          <strong>Anleitung:</strong> 1) TOP links auswählen → 2) Zeilen rechts
-          anklicken (Shift+Klick für Bereich) → 3) Zugeordnete Zeilen werden
-          farblich markiert{audioUrl && ' → Doppelklick auf Zeile zum Abspielen'}
+          <strong>Anleitung:</strong> 1) TOP links auswählen → 2) Zeilen anklicken (Shift+Klick für Bereich) → 3) Für teilweise Zuordnung: Text innerhalb einer Zeile markieren{audioUrl && ' → Doppelklick zum Abspielen'}
         </p>
       </div>
 
@@ -210,7 +252,12 @@ export default function AssignmentStep({
                   <span className="font-medium text-gray-600">
                     {getDisplayName(line.speaker)}:
                   </span>{' '}
-                  <span className="text-gray-800">{line.text}</span>
+                  <span
+                    className="text-gray-800"
+                    onMouseUp={(e) => handleTextMouseUp(index, e)}
+                  >
+                    {line.text}
+                  </span>
                   <span className="ml-2 text-xs text-gray-400">
                     [{formatTime(line.start)}]
                   </span>
@@ -220,6 +267,41 @@ export default function AssignmentStep({
           </div>
         </div>
       </div>
+
+      {/* Text-selection popup */}
+      {selectionPopup && (() => {
+        const color = getColor(selectedTop);
+        const line = transcript[selectionPopup.lineIndex];
+        const selectedText = line?.text.slice(selectionPopup.startChar, selectionPopup.endChar) ?? '';
+        const preview = selectedText.length > 50 ? selectedText.slice(0, 50) + '…' : selectedText;
+        const popupY = selectionPopup.y - 64;
+        return (
+          <div
+            className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-xl p-2 flex items-center gap-2 text-sm"
+            style={{ left: Math.min(selectionPopup.x - 60, window.innerWidth - 300), top: popupY < 8 ? selectionPopup.y + 12 : popupY }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${color.dot}`} />
+            <span className="text-gray-500 italic truncate max-w-[160px]">„{preview}"</span>
+            <button
+              className={`px-2 py-1 rounded text-xs font-medium border ${color.bg} ${color.border} ${color.text} hover:opacity-80 flex-shrink-0`}
+              onClick={() => {
+                onSplitAndAssign(selectionPopup.lineIndex, selectionPopup.startChar, selectionPopup.endChar, selectedTop);
+                setSelectionPopup(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+            >
+              TOP {selectedTop + 1} zuordnen
+            </button>
+            <button
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-base leading-none"
+              onClick={() => { setSelectionPopup(null); window.getSelection()?.removeAllRanges(); }}
+            >
+              ✕
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Actions */}
       <div className="flex justify-between">

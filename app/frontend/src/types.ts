@@ -68,6 +68,7 @@ export interface AssignmentStepProps {
   audioUrl?: string;  // URL to stream audio for playback
   speakerNames: Record<string, string>;
   setSpeakerNames: (names: Record<string, string>) => void;
+  onSplitAndAssign: (lineIndex: number, startChar: number, endChar: number, topIndex: number) => void;
 }
 
 export interface SummaryStepProps {
