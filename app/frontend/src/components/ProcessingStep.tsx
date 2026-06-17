@@ -63,7 +63,7 @@ export default function ProcessingStep({ progress, status }: ProcessingStepProps
 
         {/* Tip */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          Tipp: Die Transkription eines 2-Stunden-Meetings dauert ca. 10-15
+          Hinweis: Die Transkription eines 2-Stunden-Meetings dauert ca. 5-10
           Minuten.
         </div>
       </div>
