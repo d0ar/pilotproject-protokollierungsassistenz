@@ -41,6 +41,8 @@ export default function AssignmentStep({
   speakerNames,
   setSpeakerNames,
   onSplitAndAssign,
+  onUndo,
+  canUndo,
 }: AssignmentStepProps) {
   const [selectedTop, setSelectedTop] = useState(0);
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
@@ -59,16 +61,14 @@ export default function AssignmentStep({
   // Auto-scroll to current line during playback
   useEffect(() => {
     if (isAutoScroll && currentLineIndex >= 0 && transcriptContainerRef.current) {
-      const lineElement = transcriptContainerRef.current.children[currentLineIndex] as HTMLElement;
-      if (lineElement) {
-        lineElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      const lineElement = transcriptContainerRef.current.querySelector(
+        `[data-line-index="${currentLineIndex}"]`
+      ) as HTMLElement | null;
+      lineElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [currentLineIndex, isAutoScroll]);
 
-  // Helper to get display name for a speaker
   const getDisplayName = (speakerId: string) => speakerNames[speakerId] || speakerId;
-
   const getColor = (topIndex: number): TopColor => topColors[topIndex % topColors.length]!;
 
   const getAssignmentCounts = (): Record<number, number> => {
@@ -89,34 +89,79 @@ export default function AssignmentStep({
     return () => document.removeEventListener('mousedown', dismiss);
   }, [selectionPopup]);
 
-  const handleTextMouseUp = (lineIndex: number, event: MouseEvent<HTMLSpanElement>) => {
+  // Walk up the DOM from a node to find the nearest data-line-index attribute value
+  const findLineIndex = (node: Node, container: Element): number | null => {
+    let el: Element | null =
+      node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    while (el && el !== container) {
+      const idx = el.getAttribute('data-line-index');
+      if (idx !== null) return parseInt(idx, 10);
+      el = el.parentElement;
+    }
+    return null;
+  };
+
+  // Get char offset of a Range boundary within a text span element.
+  // Returns null if the boundary node is not inside the span.
+  const getCharOffset = (textSpan: Element, node: Node, offset: number): number | null => {
+    if (!textSpan.contains(node)) return null;
+    // Walk all text nodes within the span to find the cumulative offset
+    let total = 0;
+    const walker = document.createTreeWalker(textSpan, NodeFilter.SHOW_TEXT);
+    let current = walker.nextNode();
+    while (current) {
+      if (current === node) return total + offset;
+      total += current.textContent?.length ?? 0;
+      current = walker.nextNode();
+    }
+    return null;
+  };
+
+  // Single mouseup handler on the transcript container — more robust than per-span handlers
+  const handleTranscriptMouseUp = (event: MouseEvent<HTMLDivElement>) => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-
-    const selectedText = selection.toString();
-    if (!selectedText.trim()) return;
+    if (!selection.toString().trim()) return;
 
     const range = selection.getRangeAt(0);
-    const span = event.currentTarget;
+    const container = event.currentTarget;
 
-    if (!span.contains(range.startContainer) || !span.contains(range.endContainer)) return;
+    // Both ends of the selection must be within the same transcript line
+    const startLineIdx = findLineIndex(range.startContainer, container);
+    const endLineIdx = findLineIndex(range.endContainer, container);
+    if (startLineIdx === null || startLineIdx !== endLineIdx) return;
 
-    const startChar = Math.min(range.startOffset, range.endOffset);
-    const endChar = Math.max(range.startOffset, range.endOffset);
+    const lineIndex = startLineIdx;
+    const line = transcript[lineIndex];
+    if (!line) return;
+
+    // Resolve the character-level span for this line
+    const textSpan = container.querySelector(
+      `[data-line-index="${lineIndex}"] [data-text-span]`
+    );
+    if (!textSpan) return;
+
+    const textLength = line.text.length;
+    const rawStart = getCharOffset(textSpan, range.startContainer, range.startOffset);
+    const rawEnd = getCharOffset(textSpan, range.endContainer, range.endOffset);
+
+    // At least one boundary must be within the text span
+    if (rawStart === null && rawEnd === null) return;
+
+    // Clamp boundaries to [0, textLength]
+    const startChar = Math.max(0, Math.min(rawStart ?? 0, textLength));
+    const endChar = Math.max(0, Math.min(rawEnd ?? textLength, textLength));
     if (startChar >= endChar) return;
-
-    // Prevent the parent div's onClick from also firing
-    event.stopPropagation();
 
     setSelectionPopup({ lineIndex, startChar, endChar, x: event.clientX, y: event.clientY });
   };
 
   const handleLineClick = (lineIndex: number, event: MouseEvent<HTMLDivElement>) => {
-    // Ignore click if user just made a text selection (popup is shown)
+    // If the user dragged to select text, don't treat it as a click
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().trim()) return;
 
-    // Double-click to seek audio
+    // Double-click: seek audio
     const line = transcript[lineIndex];
     if (event.detail === 2 && audioUrl && line) {
       seekToLine(lineIndex, line);
@@ -134,16 +179,25 @@ export default function AssignmentStep({
       setAssignments(newAssignments);
       setSelectionStart(null);
     } else {
-      // Single click - toggle or set
+      // Single click: toggle
       const newAssignments = [...assignments];
-      if (newAssignments[lineIndex] === selectedTop) {
-        newAssignments[lineIndex] = null; // Unassign
-      } else {
-        newAssignments[lineIndex] = selectedTop;
-      }
+      newAssignments[lineIndex] =
+        newAssignments[lineIndex] === selectedTop ? null : selectedTop;
       setAssignments(newAssignments);
       setSelectionStart(lineIndex);
     }
+  };
+
+  const confirmSplit = () => {
+    if (!selectionPopup) return;
+    onSplitAndAssign(selectionPopup.lineIndex, selectionPopup.startChar, selectionPopup.endChar, selectedTop);
+    setSelectionPopup(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const dismissPopup = () => {
+    setSelectionPopup(null);
+    window.getSelection()?.removeAllRanges();
   };
 
   const assignedCount = assignments.filter((a) => a !== null).length;
@@ -166,11 +220,22 @@ export default function AssignmentStep({
         setSpeakerNames={setSpeakerNames}
       />
 
-      {/* Progress */}
+      {/* Progress + Undo */}
       <div className="flex items-center justify-between text-sm text-gray-600">
-        <span>
-          {assignedCount} von {totalCount} Zeilen zugeordnet
-        </span>
+        <div className="flex items-center gap-3">
+          <span>
+            {assignedCount} von {totalCount} Zeilen zugeordnet
+          </span>
+          {canUndo && (
+            <button
+              onClick={onUndo}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
+              title="Letzten Schritt rückgängig machen"
+            >
+              ↩ Rückgängig
+            </button>
+          )}
+        </div>
         <div className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-500 transition-all"
@@ -201,15 +266,10 @@ export default function AssignmentStep({
                   <div className="flex items-start gap-2">
                     <div className={`w-3 h-3 rounded-full mt-1 ${color.dot}`} />
                     <div className="flex-1 min-w-0">
-                      <div
-                        className="font-medium text-sm truncate"
-                        title={top || `TOP ${index + 1}`}
-                      >
+                      <div className="font-medium text-sm truncate" title={top || `TOP ${index + 1}`}>
                         {index + 1}. {top || `TOP ${index + 1}`}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {counts[index]} Zeilen
-                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{counts[index]} Zeilen</div>
                     </div>
                   </div>
                 </button>
@@ -220,21 +280,19 @@ export default function AssignmentStep({
 
         {/* Transcript */}
         <div className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
-          {/* Audio Player */}
           {audioUrl && (
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <AudioPlayer
-                audioUrl={audioUrl}
-                currentTime={seekTime}
-                onTimeUpdate={handleTimeUpdate}
-              />
+              <AudioPlayer audioUrl={audioUrl} currentTime={seekTime} onTimeUpdate={handleTimeUpdate} />
             </div>
           )}
-
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h3 className="font-medium text-gray-900">Transkript</h3>
           </div>
-          <div ref={transcriptContainerRef} className="flex-1 overflow-y-auto p-2">
+          <div
+            ref={transcriptContainerRef}
+            className="flex-1 overflow-y-auto p-2"
+            onMouseUp={handleTranscriptMouseUp}
+          >
             {transcript.map((line, index) => {
               const assignedTo = assignments[index] ?? null;
               const color = assignedTo !== null ? getColor(assignedTo) : null;
@@ -242,6 +300,7 @@ export default function AssignmentStep({
               return (
                 <div
                   key={index}
+                  data-line-index={String(index)}
                   onClick={(e) => handleLineClick(index, e)}
                   className={`px-3 py-2 rounded cursor-pointer transition-colors text-sm border-l-4 mb-1 ${
                     color
@@ -249,18 +308,9 @@ export default function AssignmentStep({
                       : 'border-transparent hover:bg-gray-100'
                   } ${isCurrentLine ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}
                 >
-                  <span className="font-medium text-gray-600">
-                    {getDisplayName(line.speaker)}:
-                  </span>{' '}
-                  <span
-                    className="text-gray-800"
-                    onMouseUp={(e) => handleTextMouseUp(index, e)}
-                  >
-                    {line.text}
-                  </span>
-                  <span className="ml-2 text-xs text-gray-400">
-                    [{formatTime(line.start)}]
-                  </span>
+                  <span className="font-medium text-gray-600">{getDisplayName(line.speaker)}:</span>{' '}
+                  <span data-text-span="true" className="text-gray-800">{line.text}</span>
+                  <span className="ml-2 text-xs text-gray-400">[{formatTime(line.start)}]</span>
                 </div>
               );
             })}
@@ -278,24 +328,23 @@ export default function AssignmentStep({
         return (
           <div
             className="fixed z-50 bg-white border border-gray-300 rounded-lg shadow-xl p-2 flex items-center gap-2 text-sm"
-            style={{ left: Math.min(selectionPopup.x - 60, window.innerWidth - 300), top: popupY < 8 ? selectionPopup.y + 12 : popupY }}
+            style={{
+              left: Math.min(selectionPopup.x - 60, window.innerWidth - 300),
+              top: popupY < 8 ? selectionPopup.y + 12 : popupY,
+            }}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${color.dot}`} />
             <span className="text-gray-500 italic truncate max-w-[160px]">„{preview}"</span>
             <button
-              className={`px-2 py-1 rounded text-xs font-medium border ${color.bg} ${color.border} ${color.text} hover:opacity-80 flex-shrink-0`}
-              onClick={() => {
-                onSplitAndAssign(selectionPopup.lineIndex, selectionPopup.startChar, selectionPopup.endChar, selectedTop);
-                setSelectionPopup(null);
-                window.getSelection()?.removeAllRanges();
-              }}
+              className={`px-2 py-1 rounded text-xs font-medium border flex-shrink-0 ${color.bg} ${color.border} ${color.text} hover:opacity-80`}
+              onClick={confirmSplit}
             >
               TOP {selectedTop + 1} zuordnen
             </button>
             <button
               className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-base leading-none"
-              onClick={() => { setSelectionPopup(null); window.getSelection()?.removeAllRanges(); }}
+              onClick={dismissPopup}
             >
               ✕
             </button>

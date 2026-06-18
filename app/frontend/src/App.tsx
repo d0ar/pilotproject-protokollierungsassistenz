@@ -72,6 +72,7 @@ export default function App() {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [skippedAssignment, setSkippedAssignment] = useState(false);
   const [transcriptOnly, setTranscriptOnly] = useState(false);
+  const [splitHistory, setSplitHistory] = useState<Array<{ transcript: TranscriptLine[]; assignments: (number | null)[] }>>([]);
 
   // Helper to apply speaker name mappings to transcript lines for summarization
   const applySpeakerNames = (lines: TranscriptLine[]): TranscriptLine[] => {
@@ -318,6 +319,9 @@ export default function App() {
     const line = transcript[lineIndex];
     if (!line) return;
 
+    // Save current state for undo (max 20 steps)
+    setSplitHistory((prev) => [...prev.slice(-19), { transcript, assignments }]);
+
     const currentAssignment = assignments[lineIndex] ?? null;
     const totalChars = line.text.length;
     const duration = line.end - line.start;
@@ -347,10 +351,19 @@ export default function App() {
     setAssignments([...assignments.slice(0, lineIndex), ...newAssignments, ...assignments.slice(lineIndex + 1)]);
   };
 
+  const handleUndoSplit = () => {
+    if (splitHistory.length === 0) return;
+    const prev = splitHistory[splitHistory.length - 1]!;
+    setSplitHistory((h) => h.slice(0, -1));
+    setTranscript(prev.transcript);
+    setAssignments(prev.assignments);
+  };
+
   const handleStep2Back = () => {
     setCurrentStep(1);
     setTranscript([]);
     setAssignments([]);
+    setSplitHistory([]);
     setProcessingError(null);
     setAudioUrl(null);
   };
@@ -471,6 +484,8 @@ export default function App() {
           speakerNames={speakerNames}
           setSpeakerNames={setSpeakerNames}
           onSplitAndAssign={handleSplitAndAssign}
+          onUndo={handleUndoSplit}
+          canUndo={splitHistory.length > 0}
         />
       ) : (
         <SummaryStep

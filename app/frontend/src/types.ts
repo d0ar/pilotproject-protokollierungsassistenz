@@ -69,6 +69,8 @@ export interface AssignmentStepProps {
   speakerNames: Record<string, string>;
   setSpeakerNames: (names: Record<string, string>) => void;
   onSplitAndAssign: (lineIndex: number, startChar: number, endChar: number, topIndex: number) => void;
+  onUndo: () => void;
+  canUndo: boolean;
 }
 
 export interface SummaryStepProps {
