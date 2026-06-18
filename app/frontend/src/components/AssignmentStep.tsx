@@ -245,7 +245,7 @@ export default function AssignmentStep({
       </div>
 
       {/* Main Layout */}
-      <div className="flex gap-6 h-[600px]">
+      <div className="flex gap-6 h-[calc(100vh-320px)] min-h-[500px]">
         {/* TOPs Sidebar */}
         <div className="w-72 bg-white rounded-lg border border-gray-200 p-4 overflow-y-auto">
           <h3 className="font-medium text-gray-900 mb-4">Tagesordnung</h3>
