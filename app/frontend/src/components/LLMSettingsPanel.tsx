@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getBackendVersion } from '../api';
 
 export interface LLMSettings {
   model: string;
@@ -142,6 +143,13 @@ export default function LLMSettingsPanel({
 }: LLMSettingsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && backendVersion === null) {
+      getBackendVersion().then(setBackendVersion);
+    }
+  }, [isOpen, backendVersion]);
 
   // Close on escape key
   useEffect(() => {
@@ -330,10 +338,14 @@ export default function LLMSettingsPanel({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 space-y-1">
           <p className="text-xs text-gray-500 text-center">
             Einstellungen werden automatisch gespeichert
           </p>
+          <div className="flex justify-between text-xs text-gray-400 font-mono">
+            <span>Frontend: {__APP_VERSION__}</span>
+            <span>Backend: {backendVersion ?? '…'}</span>
+          </div>
         </div>
       </div>
     </>

@@ -4,6 +4,7 @@ FastAPI Backend for Meeting Minutes Generator
 
 import os
 import re
+import subprocess
 import uuid
 import time
 import logging
@@ -46,6 +47,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def get_version() -> str:
+    if version := os.environ.get("APP_VERSION"):
+        return version
+    try:
+        return subprocess.check_output(
+            ["git", "describe", "--tags", "--always"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+    except Exception:
+        return "0.1.0"
+
+
+APP_VERSION = get_version()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -60,7 +77,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Protokollierungsassistenz API",
     description="API für die automatische Erstellung von Sitzungsprotokollen",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -191,7 +208,7 @@ class SessionCompleteResponse(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "Protokollierungsassistenz API", "version": "0.1.0"}
+    return {"message": "Protokollierungsassistenz API", "version": APP_VERSION}
 
 
 @app.get("/health")
@@ -200,7 +217,13 @@ async def health_check():
     Health check endpoint for Docker/Kubernetes.
     Returns 200 when the server is running. Models are loaded on demand.
     """
-    return {"status": "healthy", "version": "0.1.0"}
+    return {"status": "healthy", "version": APP_VERSION}
+
+
+@app.get("/api/version")
+async def get_api_version():
+    """Return the current backend version (Git tag or APP_VERSION env var)."""
+    return {"version": APP_VERSION}
 
 
 @app.post("/api/transcribe", response_model=TranscriptionJob)

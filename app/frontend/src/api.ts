@@ -175,6 +175,20 @@ export async function extractTOPsFromPDF(
 }
 
 /**
+ * Fetch the backend version (Git tag or APP_VERSION env var).
+ */
+export async function getBackendVersion(): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_BASE}/api/version`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check if the backend is available.
  */
 export async function checkBackendHealth(): Promise<boolean> {
